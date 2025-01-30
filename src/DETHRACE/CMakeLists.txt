@@ -17,6 +17,7 @@ endif()
 
 target_link_libraries(dethrace_obj PUBLIC SDL2::SDL2 smackw32 harness BRender::Full BRender::DDI s3)
 target_link_libraries(dethrace_obj PUBLIC /opt/toolchains/dc/kos-ports/lib/libtremor.a)
+target_link_libraries(dethrace_obj PUBLIC /opt/toolchains/dc/kos/lib/dreamcast/libkallisti.a)
 target_link_libraries(dethrace_obj PUBLIC /opt/toolchains/dc/kos-ports/lib/libADX.a)
 target_link_libraries(dethrace_obj PUBLIC /opt/toolchains/dc/kos-ports/lib/libwav.a)
 
@@ -94,6 +95,7 @@ set(OPTIMIZED_FILES
 set_source_files_properties(
     ${OPTIMIZED_FILES}
     PROPERTIES COMPILE_FLAGS "-fno-builtin -fno-lto -fno-fast-math"
+    #PROPERTIES COMPILE_FLAGS "-fno-fast-math"
 )
 
 target_sources(dethrace_obj PRIVATE
