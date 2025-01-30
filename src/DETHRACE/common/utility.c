@@ -64,8 +64,8 @@ int CheckQuit(void) {
     return 1;
 }
 
-// IDA: double __cdecl sqr(double pN)
-double sqr(double pN) {
+// IDA: float __cdecl sqr(float pN)
+float sqr(float pN) {
 
     return pN * pN;
 }
@@ -234,7 +234,7 @@ int IRandomPosNeg(int pN) {
 // IDA: float __cdecl FRandomBetween(float pA, float pB)
 float FRandomBetween(float pA, float pB) {
     LOG_TRACE8("(%f, %f)", pA, pB);
-    return (double)rand() * (pB - pA) / (double)RAND_MAX + pA;
+    return (float)rand() * (pB - pA) / (float)RAND_MAX + pA;
 }
 
 // IDA: float __cdecl FRandomPosNeg(float pN)
@@ -814,8 +814,8 @@ void MaterialCopy(br_material* pDst, br_material* pSrc) {
     pDst->identifier = pSrc->identifier;
 }
 
-// IDA: double __usercall RGBDifferenceSqr@<ST0>(tRGB_colour *pColour_1@<EAX>, tRGB_colour *pColour_2@<EDX>)
-double RGBDifferenceSqr(tRGB_colour* pColour_1, tRGB_colour* pColour_2) {
+// IDA: float __usercall RGBDifferenceSqr@<ST0>(tRGB_colour *pColour_1@<EAX>, tRGB_colour *pColour_2@<EDX>)
+float RGBDifferenceSqr(tRGB_colour* pColour_1, tRGB_colour* pColour_2) {
     LOG_TRACE("(%p, %p)", pColour_1, pColour_2);
 
     return ((pColour_1->red - pColour_2->red) * (pColour_1->red - pColour_2->red))
@@ -827,14 +827,14 @@ double RGBDifferenceSqr(tRGB_colour* pColour_1, tRGB_colour* pColour_2) {
 int FindBestMatch(tRGB_colour* pRGB_colour, br_pixelmap* pPalette) {
     int n;
     int near_c;
-    double min_d;
-    double d;
+    float min_d;
+    float d;
     tRGB_colour trial_RGB;
     br_colour* dp;
     LOG_TRACE("(%p, %p)", pRGB_colour, pPalette);
 
     near_c = 127;
-    min_d = 1.79769e+308; // max double
+    min_d = 1.79769e+308; // max float
     dp = pPalette->pixels;
     for (n = 0; n < 256; n++) {
         trial_RGB.red = (dp[n] >> 16) & 0xff;
@@ -912,10 +912,10 @@ br_pixelmap* GenerateDarkenedShadeTable(int pHeight, br_pixelmap* pPalette, int 
     br_colour* cp;
     char* tab_ptr;
     char* shade_ptr;
-    double f_i;
-    double f_total_minus_1;
-    double ratio1;
-    double ratio2;
+    float f_i;
+    float f_total_minus_1;
+    float ratio1;
+    float ratio2;
     int i;
     int c;
     LOG_TRACE("(%d, %p, %d, %d, %d, %f, %f, %f, %f)", pHeight, pPalette, pRed_mix, pGreen_mix, pBlue_mix, pQuarter, pHalf, pThree_quarter, pDarken);

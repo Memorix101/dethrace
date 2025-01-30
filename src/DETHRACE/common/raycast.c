@@ -273,18 +273,18 @@ int DRModelPick2D__raycast(br_model* model, br_material* material, br_vector3* r
     br_scalar n;
     br_scalar d;
     br_vector3 p;
-    double u0;
-    double u1;
-    double u2;
-    double v0;
-    double v1;
-    double v2;
+    float u0;
+    float u1;
+    float u2;
+    float v0;
+    float v1;
+    float v2;
     br_scalar v0i1;
     br_scalar v0i2;
-    double alpha;
-    double beta;
-    double f_d;
-    double f_n;
+    float alpha;
+    float beta;
+    float f_d;
+    float f_n;
     br_scalar s_alpha;
     br_scalar s_beta;
     br_vector2 map;
@@ -293,7 +293,7 @@ int DRModelPick2D__raycast(br_model* model, br_material* material, br_vector3* r
     int r;
     br_material* this_material;
     br_scalar numerator;
-    double f_numerator;
+    float f_numerator;
     LOG_TRACE("(%p, %p, %p, %p, %f, %f, %p, %p)", model, material, ray_pos, ray_dir, t_near, t_far, callback, arg);
 
     struct v11group* grp_ptr;

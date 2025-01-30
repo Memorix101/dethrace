@@ -57,8 +57,9 @@ if(DETHRACE_REPLAY_DEBUG)
 endif()
 
 set(COMMON_COMPILE_FLAGS
+    #-g
+    #-Og
     -O3
-
     #-fno-math-errno
         #-fno-signed-zeros
     #-fno-trapping-math
@@ -75,8 +76,8 @@ set(COMMON_COMPILE_FLAGS
     -fbuiltin 
     -flto=auto
     -ffast-math 
-    #-mfsca 
-    #-mfsrra
+    -mfsca 
+    -mfsrra
     -ffp-contract=fast
 )
 target_compile_options(dethrace_obj PRIVATE ${COMMON_COMPILE_FLAGS})

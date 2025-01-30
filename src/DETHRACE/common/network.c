@@ -711,7 +711,7 @@ int NetJoinGame(tNet_game_details* pDetails, char* pPlayer_name, int pCar_index)
         } else {
             gNet_mode = eNet_mode_none;
 #if !defined(DETHRACE_FIX_BUGS)
-            // Avoid double free
+            // Avoid float free
             NetDisposeGameDetails(gCurrent_net_game);
 #endif
             gCurrent_net_game = NULL;

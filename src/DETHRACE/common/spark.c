@@ -937,8 +937,8 @@ void SmokeCircle(br_vector3* o, br_scalar r, br_scalar extra_z, br_scalar streng
     }
     shade_ptr = (tU8*)pShade_table->pixels + pShade_table->row_bytes * (pShade_table->base_y + 1);
     shade_offset = strength * 14.99f;
-    r_multiplier = shade_offset / (double)max_r_squared;
-    z_multiplier = extra_z / (double)max_r_squared;
+    r_multiplier = shade_offset / (float)max_r_squared;
+    z_multiplier = extra_z / (float)max_r_squared;
     max_x = pRender_screen->width - ox - 1;
     min_x = -ox;
     ry = r / pAspect;
@@ -1281,13 +1281,13 @@ void RenderSmoke(br_pixelmap* pRender_screen, br_pixelmap* pDepth_buffer, br_act
                     if (gSmoke[i].pipe_me) {
                         AddSmokeToPipingSession(i, gSmoke[i].type, &gSmoke[i].pos, gSmoke[i].radius, gSmoke[i].strength);
                     }
-                    gSmoke[i].radius = (double)pTime / 1000.0 * gSmoke[i].strength * 0.5 + gSmoke[i].radius;
-                    gSmoke[i].strength = gSmoke[i].strength - (double)pTime * gSmoke[i].decay_factor / 1000.0;
+                    gSmoke[i].radius = (float)pTime / 1000.0 * gSmoke[i].strength * 0.5 + gSmoke[i].radius;
+                    gSmoke[i].strength = gSmoke[i].strength - (float)pTime * gSmoke[i].decay_factor / 1000.0;
                     if (gSmoke[i].radius > 0.3f) {
                         gSmoke[i].radius = 0.3f;
                     }
                     if (gSmoke[i].strength > 0.0) {
-                        ts = 1.0f - (double)pTime * 0.002f;
+                        ts = 1.0f - (float)pTime * 0.002f;
                         if (ts < 0.5f) {
                             ts = 0.5f;
                         }
@@ -2274,7 +2274,7 @@ void SingleSplash(tCar_spec* pCar, br_vector3* sp, br_vector3* normal, tU32 pTim
     }
     gSplash_flags |= 1u << gNext_splash;
     gSplash[gNext_splash].just_done = 1;
-    if ((double)pTime * 0.003 > SRandomBetween(0.0, 1.0) && !gAction_replay_mode) {
+    if ((float)pTime * 0.003 > SRandomBetween(0.0, 1.0) && !gAction_replay_mode) {
         BrVector3InvScale(&vel, &vel, WORLD_SCALE);
         BrVector3Scale(&tv, &vel, 0.1f);
         speed = sqrt(ts / 70.0) * 15.0;

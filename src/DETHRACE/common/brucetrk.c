@@ -270,8 +270,8 @@ void ExtractColumns(tTrack_spec* pTrack_spec) {
     pTrack_spec->ncolumns_z = z;
 
     BrActorToBounds(&bounds, pTrack_spec->the_actor);
-    pTrack_spec->column_size_x = (bounds.max.v[0] - bounds.min.v[0] + extra_room * 2.0) / (double)pTrack_spec->ncolumns_x;
-    pTrack_spec->column_size_z = (bounds.max.v[2] - bounds.min.v[2] + extra_room * 2.0) / (double)pTrack_spec->ncolumns_z;
+    pTrack_spec->column_size_x = (bounds.max.v[0] - bounds.min.v[0] + extra_room * 2.0) / (float)pTrack_spec->ncolumns_x;
+    pTrack_spec->column_size_z = (bounds.max.v[2] - bounds.min.v[2] + extra_room * 2.0) / (float)pTrack_spec->ncolumns_z;
     pTrack_spec->origin_x = bounds.min.v[0] - extra_room;
     pTrack_spec->origin_z = bounds.min.v[2] - extra_room;
     AllocateActorMatrix(pTrack_spec, &pTrack_spec->columns);

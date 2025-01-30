@@ -78,9 +78,9 @@ void DebugCamera_Update(void) {
         pitch = -89.0f;
 
     vec3 direction;
-    direction[0] = cos(glm_rad(yaw)) * cos(glm_rad(pitch));
-    direction[1] = sin(glm_rad(pitch));
-    direction[2] = sin(glm_rad(yaw)) * cos(glm_rad(pitch));
+    direction[0] = cosf(glm_rad(yaw)) * cosf(glm_rad(pitch));
+    direction[1] = sinf(glm_rad(pitch));
+    direction[2] = sinf(glm_rad(yaw)) * cosf(glm_rad(pitch));
     glm_normalize_to(direction, cam_front);
 }
 

@@ -177,11 +177,11 @@ int ReceiveHostResponses(void) {
         dr_dprintf("ReceiveHostResponses(): Received string '%s' from %s", gReceive_buffer, addr_string);
 
         if (SameEthernetAddress(gLocal_addr_ipx, gRemote_addr_ipx)) {
-            dr_dprintf("*** Discounting the above 'cos we sent it ***");
+            dr_dprintf("*** Discounting the above 'cosf we sent it ***");
             continue;
         }
         if (GetMessageTypeFromMessage(gReceive_buffer) != 2) {
-            dr_dprintf("*** Discounting the above 'cos it's not a host reply ***");
+            dr_dprintf("*** Discounting the above 'cosf it's not a host reply ***");
             continue;
         }
 

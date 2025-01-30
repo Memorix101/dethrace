@@ -344,7 +344,7 @@ int DRModelPick2D__finteray(br_model* model, br_material* material, br_vector3* 
 int FindHighestPolyCallBack__finteray(br_model* pModel, br_material* pMaterial, br_vector3* pRay_pos, br_vector3* pRay_dir, br_scalar pT, int pF, int pE, int pV, br_vector3* pPoint, br_vector2* pMap, void* pArg) {
     LOG_TRACE("(%p, %p, %p, %p, %f, %d, %d, %d, %p, %p, %p)", pModel, pMaterial, pRay_pos, pRay_dir, pT, pF, pE, pV, pPoint, pMap, pArg);
 
-    if (pT < (double)gNearest_T) {
+    if (pT < (float)gNearest_T) {
         gNearest_T = pT;
         gNearest_model = pModel;
         gNearest_face = pF;
@@ -409,19 +409,19 @@ void CheckSingleFace(tFace_ref* pFace, br_vector3* ray_pos, br_vector3* ray_dir,
     int axis_m;
     int axis_0;
     int axis_1;
-    double u0;
-    double u1;
-    double u2;
-    double v0;
-    double v1;
-    double v2;
+    float u0;
+    float u1;
+    float u2;
+    float v0;
+    float v1;
+    float v2;
     br_scalar v0i1;
     br_scalar v0i2;
-    double alpha;
-    double beta;
-    double f_d;
-    double f_n;
-    double f_numerator;
+    float alpha;
+    float beta;
+    float f_d;
+    float f_n;
+    float f_numerator;
     br_material* this_material;
     LOG_TRACE("(%p, %p, %p, %p, %p)", pFace, ray_pos, ray_dir, normal, rt);
 
@@ -504,19 +504,19 @@ void MultiRayCheckSingleFace(int pNum_rays, tFace_ref* pFace, br_vector3* ray_po
     int axis_m;
     int axis_0;
     int axis_1;
-    double u0[4];
-    double u1;
-    double u2;
-    double v0[4];
-    double v1;
-    double v2;
+    float u0[4];
+    float u1;
+    float u2;
+    float v0[4];
+    float v1;
+    float v2;
     br_scalar v0i1;
     br_scalar v0i2;
-    double alpha;
-    double beta;
-    double f_d;
-    double f_n;
-    double f_numerator;
+    float alpha;
+    float beta;
+    float f_d;
+    float f_n;
+    float f_numerator;
     br_material* this_material;
     LOG_TRACE("(%d, %p, %p, %p, %p, %p)", pNum_rays, pFace, ray_pos, ray_dir, normal, rt);
 
@@ -1034,7 +1034,7 @@ void ClipToPlaneLE(br_vector3* p, int* nv, int i, br_scalar limit) {
             }
             p2[j++].v[i] = limit;
         }
-        if (p[vertex].v[i] <= (double)limit) {
+        if (p[vertex].v[i] <= (float)limit) {
             BrVector3Copy(&p2[j], &p[vertex]);
             j++;
         }

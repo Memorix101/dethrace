@@ -381,9 +381,9 @@ void BuildColourTable(br_pixelmap* pPalette) {
         green = (gRGB_colours[i] >> 8) & 0xFF;
         blue = gRGB_colours[i] & 0xFF;
         for (j = 0; j < 256; j++) {
-            distance = SQR((double)(signed int)(*((br_uint_8*)pPalette->pixels + 4 * j + 2) - red));
-            distance += SQR((double)(signed int)(*((br_uint_8*)pPalette->pixels + 4 * j) - blue));
-            distance += SQR((double)(signed int)(*((br_uint_8*)pPalette->pixels + 4 * j + 1) - green));
+            distance = SQR((float)(signed int)(*((br_uint_8*)pPalette->pixels + 4 * j + 2) - red));
+            distance += SQR((float)(signed int)(*((br_uint_8*)pPalette->pixels + 4 * j) - blue));
+            distance += SQR((float)(signed int)(*((br_uint_8*)pPalette->pixels + 4 * j + 1) - green));
             if (distance < nearest_distance) {
                 nearest_index = j;
                 nearest_distance = distance;
@@ -747,8 +747,8 @@ void InitWobbleStuff(void) {
     }
 }
 
-// IDA: void __cdecl NewScreenWobble(double pAmplitude_x, double pAmplitude_y, double pPeriod)
-void NewScreenWobble(double pAmplitude_x, double pAmplitude_y, double pPeriod) {
+// IDA: void __cdecl NewScreenWobble(float pAmplitude_x, float pAmplitude_y, float pPeriod)
+void NewScreenWobble(float pAmplitude_x, float pAmplitude_y, float pPeriod) {
     int i;
     int oldest_time;
     int oldest_index;
@@ -791,9 +791,9 @@ void ResetScreenWobble(void) {
 void CalculateWobblitude(tU32 pThe_time) {
     int i;
     tU32 time_going;
-    double angle;
-    double mod_angle;
-    double cosine_over_angle;
+    float angle;
+    float mod_angle;
+    float cosine_over_angle;
     LOG_TRACE("(%d)", pThe_time);
 
     if (gProgram_state.new_view != eView_undefined) {
@@ -817,7 +817,7 @@ void CalculateWobblitude(tU32 pThe_time) {
                 } else {
                     cosine_over_angle = gCosine_array[(unsigned int)(mod_angle / DR_PI * 128.0)];
                 }
-                angle = cosine_over_angle / ((double)(pThe_time - gWobble_array[i].time_started) * 0.0035f + 1.0f);
+                angle = cosine_over_angle / ((float)(pThe_time - gWobble_array[i].time_started) * 0.0035f + 1.0f);
                 gScreen_wobble_x = (gWobble_array[i].amplitude_x * angle + gScreen_wobble_x);
                 gScreen_wobble_y = (gWobble_array[i].amplitude_y * angle + gScreen_wobble_y);
             }
@@ -868,7 +868,7 @@ void CalculateConcussion(tU32 pThe_time) {
                     } else {
                         cosine_over_angle = gCosine_array[(unsigned int)(mod_angle / DR_PI * 128.f)];
                     }
-                    angle = cosine_over_angle / ((double)time_difference * 0.02f + 1.0f);
+                    angle = cosine_over_angle / ((float)time_difference * 0.02f + 1.0f);
                     gCamera->t.t.mat.m[i][j] = angle * the_amplitude + gCamera->t.t.mat.m[i][j];
                     gRearview_camera->t.t.mat.m[i][j] = angle * the_amplitude + gRearview_camera->t.t.mat.m[i][j];
                 }
@@ -1690,7 +1690,7 @@ void RenderAFrame(int pDepth_mask_on) {
         BrZbSceneRenderEnd();
     }
     BrMatrix34Copy(&gCamera->t.t.mat, &old_camera_matrix);
-    if (gMirror_on__graphics) {
+   /* if (gMirror_on__graphics) {
         BrPixelmapFill(gRearview_depth_buffer, 0xFFFFFFFF);
         gRendering_mirror = 1;
         DoSpecialCameraEffect(gRearview_camera, &gRearview_camera_to_world);
@@ -1713,7 +1713,7 @@ void RenderAFrame(int pDepth_mask_on) {
         BrZbSceneRenderEnd();
         BrMatrix34Copy(&gRearview_camera->t.t.mat, &old_mirror_cam_matrix);
         gRendering_mirror = 0;
-    }
+    }*/
     if (gMap_mode) {
         if (gNet_mode == eNet_mode_none) {
             GetTimerString(the_text, 0);

@@ -1376,11 +1376,11 @@ void ReadMechanicsData(FILE* pF, tCar_spec* c) {
     }
 
     speed = speed * 4.0 / 9.0;
-    c->speed_revs_ratio = speed / (double)c->max_gear / 6000.0;
-    c->force_torque_ratio = (double)c->max_gear * c->M * force;
-    c->mu[1] = tan(theta_front * 3.14 / 180.0) / 4.0;
-    c->mu[0] = tan(theta_back * 3.14 / 180.0) / 4.0;
-    c->mu[2] = tan(theta_comp * 3.14 / 180.0) / 4.0;
+    c->speed_revs_ratio = speed / (float)c->max_gear / 6000.0;
+    c->force_torque_ratio = (float)c->max_gear * c->M * force;
+    c->mu[1] = tanf(theta_front * 3.14 / 180.0) / 4.0;
+    c->mu[0] = tanf(theta_back * 3.14 / 180.0) / 4.0;
+    c->mu[2] = tanf(theta_comp * 3.14 / 180.0) / 4.0;
 
     c->mu[0] *= sqrt((c->wpos[2].v[2] - c->cmpos.v[2]) / (c->wpos[2].v[2] - c->wpos[0].v[2]) * (c->M * 5.0));
     c->mu[1] *= sqrt((c->wpos[0].v[2] - c->cmpos.v[2]) / (c->wpos[0].v[2] - c->wpos[2].v[2]) * (c->M * 5.0));

@@ -86,7 +86,7 @@ void AllocateCamera(void) {
         camera_ptr->field_of_view = BrDegreeToAngle(gCamera_angle);
         camera_ptr->hither_z = gCamera_hither;
         camera_ptr->yon_z = gCamera_yon;
-        camera_ptr->aspect = (double)gWidth / (double)gHeight;
+        camera_ptr->aspect = (float)gWidth / (float)gHeight;
     }
 
     gCamera_list[0] = BrActorAdd(gSelf, gCamera_list[0]);
@@ -109,7 +109,7 @@ void AllocateCamera(void) {
     camera_ptr->type = BR_CAMERA_PERSPECTIVE_FOV;
     camera_ptr->yon_z = gCamera_yon;
     camera_ptr->field_of_view = BrDegreeToAngle(gCamera_angle);
-    camera_ptr->aspect = (double)gWidth / (double)gHeight;
+    camera_ptr->aspect = (float)gWidth / (float)gHeight;
     gRearview_camera = BrActorAdd(gSelf, gRearview_camera);
     if (gRearview_camera == NULL) {
         FatalError(kFatalError_AllocateCamera);
@@ -129,10 +129,10 @@ void ReinitialiseForwardCamera(void) {
     if (gProgram_state.cockpit_on) {
         the_angle = gCamera_angle / 2.0;
 
-        d = atan(
+        d = atanf(
                 tandeg(the_angle)
-                * (double)gRender_screen->height
-                / (double)(gProgram_state.current_car.render_bottom[0] - gProgram_state.current_car.render_top[0]))
+                * (float)gRender_screen->height
+                / (float)(gProgram_state.current_car.render_bottom[0] - gProgram_state.current_car.render_top[0]))
             * 114.5915590261646;
         camera_ptr->field_of_view = BrDegreeToAngle(d);
         BrMatrix34Identity(&gCamera->t.t.mat);

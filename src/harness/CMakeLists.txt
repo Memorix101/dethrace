@@ -53,7 +53,7 @@ target_sources(harness PRIVATE
     harness_trace.c
     harness.c
     harness.h
-    audio/miniaudio.c
+    audio/miniaudio_wav.c
     win95/polyfill.c
     win95/winsock.c
     platforms/null.c

@@ -962,11 +962,11 @@ int original_main(int pArgc, char** pArgv) {
         }
     }
 #ifdef __DREAMCAST__    
+    gReplay_override = 1;
     gGraf_spec_index = 0;
-    gYon_multiplier = 1.0;
-    gCar_simplification_level = 0;
+    gYon_multiplier = 0.5;
+    //gCar_simplification_level = 0;
     gCut_scene_override = 0;
-    gReplay_override = 0;
     gSound_override = 0;
     gAustere_override = 1;
 #endif

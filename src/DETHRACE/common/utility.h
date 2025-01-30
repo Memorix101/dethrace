@@ -16,7 +16,7 @@ typedef br_uint_32 recurse_with_mat_cbfn(br_actor*, br_material*, void*);
 
 int CheckQuit(void);
 
-double sqr(double pN);
+float sqr(float pN);
 
 void EncodeLine(char* pS);
 
@@ -108,7 +108,7 @@ int Flash(tU32 pPeriod, tU32* pLast_change, int* pCurrent_state);
 
 void MaterialCopy(br_material* pDst, br_material* pSrc);
 
-double RGBDifferenceSqr(tRGB_colour* pColour_1, tRGB_colour* pColour_2);
+float RGBDifferenceSqr(tRGB_colour* pColour_1, tRGB_colour* pColour_2);
 
 int FindBestMatch(tRGB_colour* pRGB_colour, br_pixelmap* pPalette);
 

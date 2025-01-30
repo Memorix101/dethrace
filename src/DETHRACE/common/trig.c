@@ -321,7 +321,7 @@ br_angle FastFloatArcTan2Angle(float pY, float pX) {
         }
     } else if (pX >= 0.0) {
         if (pY >= 0.0) {
-            if (abs_y <= (double)abs_x) {
+            if (abs_y <= (float)abs_x) {
                 return (abs_y / abs_x * 8192.0);
             } else {
                 return ((2.0 - abs_x / abs_y) * 8192.0f);

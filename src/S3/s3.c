@@ -339,8 +339,8 @@ int S3SoundBankReadEntry(tS3_soundbank_read_ctx* ctx, char* dir_name, int low_me
     int i;                // [esp+10h] [ebp-20h]
     int proxy_id;         // [esp+14h] [ebp-1Ch] BYREF
     tS3_descriptor* desc; // [esp+18h] [ebp-18h]
-    double tmp1;          // [esp+1Ch] [ebp-14h] BYREF
-    double tmp2;          // [esp+24h] [ebp-Ch] BYREF
+    float tmp1;          // [esp+1Ch] [ebp-14h] BYREF
+    float tmp2;          // [esp+24h] [ebp-Ch] BYREF
     int char_count;       // [esp+2Ch] [ebp-4h] BYREF
     char cda_dir_name[4];
 
@@ -1082,8 +1082,8 @@ int S3IRandomBetweenLog(int pMin, int pMax, int pDefault) {
 }
 
 // duplicate of S3FRandomBetween2
-double S3FRandomBetween(double pMin, double pMax) {
-    return (double)rand() * (pMax - pMin) / (double)RAND_MAX + pMin;
+float S3FRandomBetween(float pMin, float pMax) {
+    return (float)rand() * (pMax - pMin) / (float)RAND_MAX + pMin;
 }
 
 int S3GenerateTag(tS3_outlet* outlet) {

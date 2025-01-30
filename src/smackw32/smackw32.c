@@ -24,9 +24,9 @@ Smack* SmackOpen(const char* name, uint32_t flags, uint32_t extrabuf) {
     unsigned char channels_smk[7];
     unsigned char bitdepth_smk[7];
     unsigned long sample_rate_smk[7];
-    double microsecs_per_frame;
+    float microsecs_per_frame;
     Smack* smack;
-    double fps;
+    float fps;
 
     smk smk_handle = smk_open_file(name, SMK_MODE_MEMORY);
     if (smk_handle == NULL) {

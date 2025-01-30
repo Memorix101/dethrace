@@ -284,7 +284,7 @@ tAudioBackend_error_code AudioBackend_PlayCDA(int track) {
 
     printf("Starting music track: %s\n", path);
     AudioBackend_StopCDA(); 
-    //sndoggvorbis_stop(); // double tap ... u know
+    //sndoggvorbis_stop(); // float tap ... u know
 
     if(cda_hnd != NULL){
         wav_stop(cda_hnd); 

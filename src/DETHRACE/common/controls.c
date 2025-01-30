@@ -1561,8 +1561,8 @@ void CheckOtherRacingKeys(void) {
                     if (amount == 0.0f) {
                         new_level = 0;
                     } else {
-                        new_level = ((double)gProgram_state.current_car.damage_units[j].damage_level
-                            - floor(bodywork_repair_amount / amount * (double)gProgram_state.current_car.damage_units[j].damage_level));
+                        new_level = ((float)gProgram_state.current_car.damage_units[j].damage_level
+                            - floor(bodywork_repair_amount / amount * (float)gProgram_state.current_car.damage_units[j].damage_level));
                     }
                     if (new_level >= 0) {
                         if (new_level < 100) {
@@ -2043,7 +2043,7 @@ void PollCameraControls(tU32 pTime_difference) {
     }
     if (!gMap_mode && !gProgram_state.cockpit_on && (!gAction_replay_mode || gAction_replay_camera_mode <= eAction_replay_standard)) {
         if (KeyIsDown(31) || (up_and_down_mode && !going_up)) {
-            gCamera_zoom = (double)pTime_difference * TIME_CONV_THING / (double)(2 * swirl_mode + 1) + gCamera_zoom;
+            gCamera_zoom = (float)pTime_difference * TIME_CONV_THING / (float)(2 * swirl_mode + 1) + gCamera_zoom;
             if (gCamera_zoom > 2.0f) {
                 gCamera_zoom = 2.0f;
             }
@@ -2052,7 +2052,7 @@ void PollCameraControls(tU32 pTime_difference) {
             }
         }
         if (KeyIsDown(30) || (up_and_down_mode && going_up)) {
-            gCamera_zoom = gCamera_zoom - (double)pTime_difference * TIME_CONV_THING / (double)(2 * swirl_mode + 1);
+            gCamera_zoom = gCamera_zoom - (float)pTime_difference * TIME_CONV_THING / (float)(2 * swirl_mode + 1);
             if (gCamera_zoom < 0.1) {
                 gCamera_zoom = 0.1;
                 if (up_and_down_mode) {

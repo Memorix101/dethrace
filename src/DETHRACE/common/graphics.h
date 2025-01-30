@@ -146,7 +146,7 @@ void ClearWobbles(void);
 
 void InitWobbleStuff(void);
 
-void NewScreenWobble(double pAmplitude_x, double pAmplitude_y, double pPeriod);
+void NewScreenWobble(float pAmplitude_x, float pAmplitude_y, float pPeriod);
 
 void SetScreenWobble(int pWobble_x, int pWobble_y);
 

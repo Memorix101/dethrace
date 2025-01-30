@@ -421,7 +421,7 @@ void CalcRaceRoute(tOpponent_spec* pOpponent_spec) {
     LOG_TRACE("(%p)", pOpponent_spec);
 
     if (pOpponent_spec->nnext_sections >= COUNT_OF(pOpponent_spec->next_sections)) {
-        dr_dprintf("%s: CalcRaceRoute() - Pissing off 'cos projected route full up", pOpponent_spec->car_spec->driver_name);
+        dr_dprintf("%s: CalcRaceRoute() - Pissing off 'cosf projected route full up", pOpponent_spec->car_spec->driver_name);
         return;
     }
     if (pOpponent_spec->nnext_sections == 0) {
@@ -1284,7 +1284,7 @@ void ProcessGetNearPlayer(tOpponent_spec* pOpponent_spec, tProcess_objective_com
         }
         if (pOpponent_spec->follow_path_data.section_no > 20000) {
             if (pOpponent_spec->player_to_oppo_d < 10.0 || pOpponent_spec->follow_path_data.section_no == pOpponent_spec->players_section_when_last_calced_full_path) {
-                dr_dprintf("%s: ProcessGetNearPlayer() - giving up 'cos got to player's section", pOpponent_spec->car_spec->driver_name);
+                dr_dprintf("%s: ProcessGetNearPlayer() - giving up 'cosf got to player's section", pOpponent_spec->car_spec->driver_name);
                 ObjectiveComplete(pOpponent_spec);
                 return;
             }

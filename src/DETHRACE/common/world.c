@@ -3628,7 +3628,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.spin_info.period != 0.0) {
-                    pos = sin(
+                    pos = sinf(
                               BrAngleToRadian(
                                   BrDegreeToAngle(
                                       fmod(pTime, pGroove->object_data.spin_info.period) / pGroove->object_data.spin_info.period * 360.0)))
@@ -3658,7 +3658,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.spin_info.period != 0.0) {
-                    pos = sin(
+                    pos = sinf(
                               BrAngleToRadian(
                                   BrDegreeToAngle(
                                       fmod(pTime, pGroove->object_data.spin_info.period) / pGroove->object_data.spin_info.period * 360.0)))
@@ -3688,7 +3688,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.spin_info.period != 0.0) {
-                    pos = sin(
+                    pos = sinf(
                               BrAngleToRadian(
                                   BrDegreeToAngle(
                                       fmod(pTime, pGroove->object_data.spin_info.period) / pGroove->object_data.spin_info.period * 360.0)))
@@ -3721,7 +3721,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
             }
         } else if (pGroove->object_mode == eMove_harmonic) {
             if (pGroove->object_data.rock_info.period != 0.0) {
-                pos = sin(
+                pos = sinf(
                           BrAngleToRadian(
                               BrDegreeToAngle(
                                   fmod(pTime, pGroove->object_data.rock_info.period) / pGroove->object_data.rock_info.period * 360.0)))
@@ -3783,7 +3783,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
             }
         } else if (pGroove->object_mode == eMove_harmonic) {
             if (pGroove->object_data.throb_info.z_period != 0.0) {
-                z_size = sin(
+                z_size = sinf(
                              BrAngleToRadian(
                                  BrDegreeToAngle(
                                      fmod(pTime, pGroove->object_data.throb_info.z_period) / pGroove->object_data.throb_info.z_period * 360.0)))
@@ -3812,7 +3812,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
             }
         } else if (pGroove->object_mode == eMove_harmonic) {
             if (pGroove->object_data.throb_info.x_period != 0.0) {
-                x_size = sin(
+                x_size = sinf(
                              BrAngleToRadian(
                                  BrDegreeToAngle(
                                      fmod(pTime, pGroove->object_data.throb_info.x_period) / pGroove->object_data.throb_info.x_period * 360.0)))
@@ -3841,7 +3841,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
             }
         } else if (pGroove->object_mode == eMove_harmonic) {
             if (pGroove->object_data.throb_info.y_period != 0.0) {
-                y_size = sin(
+                y_size = sinf(
                              BrAngleToRadian(
                                  BrDegreeToAngle(
                                      fmod(pTime, pGroove->object_data.throb_info.y_period) / pGroove->object_data.throb_info.y_period * 360.0)))
@@ -3875,7 +3875,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.z_period != 0.0) {
-                    z_size = sin(
+                    z_size = sinf(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.z_period) / pGroove->object_data.shear_info.z_period * 360.0)))
@@ -3904,7 +3904,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.y_period != 0.0) {
-                    y_size = sin(
+                    y_size = sinf(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.y_period) / pGroove->object_data.shear_info.y_period * 360.0)))
@@ -3935,7 +3935,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.z_period != 0.0) {
-                    z_size = sin(
+                    z_size = sinf(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.z_period) / pGroove->object_data.shear_info.z_period * 360.0)))
@@ -3964,7 +3964,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.x_period != 0.0) {
-                    x_size = sin(
+                    x_size = sinf(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.x_period) / pGroove->object_data.shear_info.x_period * 360.0)))
@@ -3995,7 +3995,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.y_period != 0.0) {
-                    y_size = sin(
+                    y_size = sinf(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.y_period) / pGroove->object_data.shear_info.y_period * 360.0)))
@@ -4024,7 +4024,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.x_period != 0.0) {
-                    x_size = sin(
+                    x_size = sinf(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.x_period) / pGroove->object_data.shear_info.x_period * 360.0)))
@@ -4113,7 +4113,7 @@ void GrooveThoseDelics(void) {
     LOG_TRACE("()");
 
     if (gGroovidelics_array != NULL) {
-        f_the_time = (double)GetTotalTime();
+        f_the_time = (float)GetTotalTime();
         gPrevious_groove_times[1] = gPrevious_groove_times[0];
         gPrevious_groove_times[0] = f_the_time;
 
