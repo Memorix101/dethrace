@@ -170,18 +170,18 @@ int ReceiveHostResponses(void) {
 
     sa_len = sizeof(gRemote_addr);
     while (1) {
-        if (recvfrom(gSocket, gReceive_buffer, sizeof(gReceive_buffer), 0, (struct sockaddr*)&gRemote_addr, (socklen_t *)&sa_len) == -1) {
+        if (recvfrom(gSocket, gReceive_buffer, sizeof(gReceive_buffer), 0, (struct sockaddr*)&gRemote_addr, &sa_len) == -1) {
             break;
         }
         NetNowIPXLocalTarget2String(addr_string, gRemote_addr_ipx);
         dr_dprintf("ReceiveHostResponses(): Received string '%s' from %s", gReceive_buffer, addr_string);
 
         if (SameEthernetAddress(gLocal_addr_ipx, gRemote_addr_ipx)) {
-            dr_dprintf("*** Discounting the above 'cosf we sent it ***");
+            dr_dprintf("*** Discounting the above 'cos we sent it ***");
             continue;
         }
         if (GetMessageTypeFromMessage(gReceive_buffer) != 2) {
-            dr_dprintf("*** Discounting the above 'cosf it's not a host reply ***");
+            dr_dprintf("*** Discounting the above 'cos it's not a host reply ***");
             continue;
         }
 
@@ -349,7 +349,7 @@ int PDNetInitialise(void) {
         }
     }
 
-    int res = getsockname(gSocket, (struct sockaddr*)&gLocal_addr, (socklen_t *)&sa_len);
+    int res = getsockname(gSocket, (struct sockaddr*)&gLocal_addr, &sa_len);
     NetNowIPXLocalTarget2String(gLocal_ipx_addr_string, gLocal_addr_ipx);
     // gNetworks[0] = *(tIPX_netnum*)gLocal_addr_ipx->sa_netnum;
     gNumber_of_networks = 1;
@@ -593,7 +593,7 @@ tNet_message* PDNetGetNextMessage(tNet_game_details* pDetails, void** pSender_ad
     sa_len = sizeof(gRemote_addr);
     msg = NetAllocateMessage(512);
     receive_buffer = (char*)msg;
-    res = recvfrom(gSocket, receive_buffer, 512, 0, (struct sockaddr*)&gRemote_addr, (socklen_t *)&sa_len);
+    res = recvfrom(gSocket, receive_buffer, 512, 0, (struct sockaddr*)&gRemote_addr, &sa_len);
     res = res != -1;
     if (res == 0) {
         res = WSAGetLastError() != WSAEWOULDBLOCK;

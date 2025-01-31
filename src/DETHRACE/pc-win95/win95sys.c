@@ -1,3 +1,4 @@
+#if 0
 #include "brender.h"
 #include "car.h"
 #include "dinput.h"
@@ -29,6 +30,34 @@
 
 #define KEYDOWN(var, key) (var[key] & 0x80)
 
+// int gExtra_mem;
+// int gReplay_override;
+// tGraf_spec gGraf_specs[2] int gASCII_table[128];
+// tU32 gKeyboard_bits[8];
+// int gASCII_shift_table[128];
+// char gNetwork_profile_fname[256];
+// tS32 gJoystick_min1y;
+// tS32 gJoystick_min2y;
+// tS32 gJoystick_min2x;
+// tS32 gRaw_joystick2y;
+// tS32 gRaw_joystick2x;
+// tS32 gRaw_joystick1y;
+// tS32 gRaw_joystick1x;
+// tS32 gJoystick_range2y;
+// tS32 gJoystick_range2x;
+// tS32 gJoystick_range1y;
+// tS32 gJoystick_range1x;
+// int gNo_voodoo;
+// int gSwitched_resolution;
+// br_pixelmap* gReal_back_screen;
+// tS32 gJoystick_min1x;
+// br_pixelmap* gTemp_screen;
+
+// tU32 gUpper_loop_limit;
+// int gReal_back_screen_locked;
+// tU32 gScan_code[123]; // was tU8 [123][2] in symbol dump
+
+int gDOSGfx_initialized;
 int gExtra_mem;
 int gReplay_override;
 tGraf_spec gGraf_specs[2] = {
@@ -55,9 +84,9 @@ int gSwitched_resolution;
 br_pixelmap* gReal_back_screen;
 tS32 gJoystick_min1x;
 br_pixelmap* gTemp_screen;
-int gGfx_initialized; // maybe renamed here
 tU32 gUpper_loop_limit;
 int gReal_back_screen_locked;
+void (*gPrev_keyboard_handler)(void);
 tU32 gScan_code[123]; // was tU8 [123][2] in symbol dump
 
 // Added by dethrace. Windows-specific. Original variable names unknown.
@@ -68,6 +97,7 @@ int gWin32_action_replay_buffer_allocated;
 void* gWin32_action_replay_buffer;
 int gWin32_action_replay_buffer_size;
 void* gWin32_hwnd;
+int gWin32_gfx_initialized;
 int gWin32_lbutton_down;
 int gWin32_rbutton_down;
 PALETTEENTRY_ gWin32_palette[256];
@@ -510,17 +540,17 @@ void PDAllocateScreenAndBack(void) {
     // this is a mix of windows and dos code
 
     dr_dprintf("PDAllocateScreenAndBack() - START...");
-    BrMaterialFindHook((br_material_find_cbfn *)PDMissingMaterial);
-    BrTableFindHook((br_table_find_cbfn *)PDMissingTable);
-    BrModelFindHook((br_model_find_cbfn *)PDMissingModel);
-    BrMapFindHook((br_map_find_cbfn *)PDMissingMap);
+    BrMaterialFindHook(PDMissingMaterial);
+    BrTableFindHook(PDMissingTable);
+    BrModelFindHook(PDMissingModel);
+    BrMapFindHook(PDMissingMap);
 
     int row_bytes;
     SSDXInitDirectDraw(gGraf_specs[gGraf_spec_index].total_width, gGraf_specs[gGraf_spec_index].total_height, &row_bytes);
     gScreen = BrPixelmapAllocate(BR_PMT_INDEX_8, gGraf_specs[gGraf_spec_index].total_width, gGraf_specs[gGraf_spec_index].total_height, NULL, BR_PMAF_NORMAL);
 
     gScreen->origin_x = 0;
-    gGfx_initialized = 1;
+    gWin32_gfx_initialized = 1;
     gScreen->origin_y = 0;
     gBack_screen = BrPixelmapMatch(gScreen, BR_PMMATCH_OFFSCREEN);
     gBack_screen->origin_x = 0;
@@ -670,8 +700,8 @@ void PDInstallErrorHandlers(void) {
     LOG_TRACE("()");
 
     gWin32_br_diaghandler.identifier = "LlantisilioBlahBlahBlahOgOgOch";
-    gWin32_br_diaghandler.warning = (void (*)(char *))Win32BRenderWarningFunc;
-    gWin32_br_diaghandler.failure = (void (*)(char *))Win32BRenderFailureFunc;
+    gWin32_br_diaghandler.warning = Win32BRenderWarningFunc;
+    gWin32_br_diaghandler.failure = Win32BRenderFailureFunc;
     BrDiagHandlerSet(&gWin32_br_diaghandler);
 }
 
@@ -815,11 +845,7 @@ void Win32AllocateActionReplayBuffer(void) {
         mem_status.dwTotalVirtual,
         mem_status.dwAvailVirtual);
 
-#ifdef __DREAMCAST__
-    buf_size = 500000;
-#else    
     buf_size = 20000000;
-#endif
 
     if (mem_status.dwTotalPhys < 16000000) {
         buf_size = 500000;
@@ -961,15 +987,7 @@ int original_main(int pArgc, char** pArgv) {
             Usage(pArgv[0]);
         }
     }
-#ifdef __DREAMCAST__    
-    gReplay_override = 1;
-    gGraf_spec_index = 0;
-    gYon_multiplier = 0.5;
-    //gCar_simplification_level = 0;
-    gCut_scene_override = 0;
-    gSound_override = 0;
-    gAustere_override = 1;
-#endif
+
     gNetwork_profile_fname[0] = 0;
     uint32_t len = GetCurrentDirectoryA_(240, gNetwork_profile_fname);
     if (len > 0 && len == strlen(gNetwork_profile_fname)) {
@@ -1185,3 +1203,5 @@ void Win32BRenderFailureFunc(char* msg) {
     dr_dprintf("*******************************************************************************");
     Win32FatalError("BRender error detected:", msg);
 }
+
+#endif

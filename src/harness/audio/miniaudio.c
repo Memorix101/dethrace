@@ -47,11 +47,14 @@ ma_engine engine;
 ma_sound cda_sound;
 int cda_sound_initialized;
 
+#ifdef __DREAMCAST__
 #include <kos.h>
 #include <math.h>
 #include <dc/sound/stream.h>
 //#include <oggvorbis/sndoggvorbis.h>
 #include <wav/sndwav.h>
+#endif
+
 #include <SDL2/SDL.h>
 
 #define NUM_SAMPLES (2048) // 2048

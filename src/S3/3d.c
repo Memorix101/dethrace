@@ -544,11 +544,11 @@ int S3Calculate3D(tS3_channel* chan, int pIs_ambient) {
     if (attenuation > 1.0f) {
         attenuation -= floor(attenuation);
     }
-    chan->left_volume = (attenuation + 1.0f) / 2.0f * ((float)chan->initial_volume * vol_multiplier) * chan->volume_multiplier;
+    chan->left_volume = (attenuation + 1.0f) / 2.0f * ((double)chan->initial_volume * vol_multiplier) * chan->volume_multiplier;
     if (chan->left_volume < 0) {
         chan->left_volume = 0;
     }
-    chan->right_volume = (1.0f - attenuation) / 2.0f * ((float)chan->initial_volume * vol_multiplier) * chan->volume_multiplier;
+    chan->right_volume = (1.0f - attenuation) / 2.0f * ((double)chan->initial_volume * vol_multiplier) * chan->volume_multiplier;
     if (chan->right_volume < 0) {
         chan->right_volume = 0;
     }

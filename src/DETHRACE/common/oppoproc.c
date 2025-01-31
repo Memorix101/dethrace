@@ -284,7 +284,7 @@ tFollow_path_result ProcessFollowPath(tOpponent_spec* pOpponent_spec, tProcess_o
                     if (data->number_of_struggles >= 3) {
                         car_spec->acc_force = 0.0f;
                         car_spec->brake_force = 0.0f;
-                        dr_dprintf("%s: Giving up trying to follow path 'cosf we've struggled too much", pOpponent_spec->car_spec->driver_name);
+                        dr_dprintf("%s: Giving up trying to follow path 'cos we've struggled too much", pOpponent_spec->car_spec->driver_name);
                         return eFPR_given_up;
                     }
                     data->number_of_struggles++;

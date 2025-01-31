@@ -161,13 +161,13 @@ void Harness_Init(int* argc, char* argv[]) {
     printf("Dethrace version: %s\n", DETHRACE_VERSION);
 
     memset(&harness_game_info, 0, sizeof(harness_game_info));
-    printf("GPF WAS HERE!!\n");
+
     // disable the original CD check code
     harness_game_config.enable_cd_check = 0;
     // original physics time step. Lower values seem to work better at 30+ fps
-    harness_game_config.physics_step_time = 40; // 40
-    // do not limit fps by default
-    harness_game_config.fps = 0;
+    harness_game_config.physics_step_time = 40;
+    // limit to 60 fps by default
+    harness_game_config.fps = 60;
     // do not freeze timer
     harness_game_config.freeze_timer = 0;
     // default demo time out is 240s
@@ -191,6 +191,7 @@ void Harness_Init(int* argc, char* argv[]) {
     harness_game_config.install_signalhandler = 1;
 
     Harness_ProcessCommandLine(argc, argv);
+
 #ifndef __DREAMCAST__
     if (harness_game_config.install_signalhandler) {
         OS_InstallSignalHandler(argv[0]);
@@ -204,7 +205,7 @@ void Harness_Init(int* argc, char* argv[]) {
     if (root_dir != NULL) {
         LOG_INFO("DETHRACE_ROOT_DIR is set to '%s'", root_dir);
     } else {
-        root_dir = OS_GetWorkingDirectory("argv[0]");
+        root_dir = OS_GetWorkingDirectory(argv[0]);
     }
     // if root_dir is null or empty, no need to chdir
     if (root_dir != NULL && root_dir[0] != '\0') {
@@ -292,6 +293,9 @@ int Harness_ProcessCommandLine(int* argc, char* argv[]) {
             handled = 1;
         } else if (strcasecmp(argv[i], "--no-bind") == 0) {
             harness_game_config.no_bind = 1;
+            handled = 1;
+        } else if (strcasecmp(argv[i], "--opengl") == 0) {
+            harness_game_config.opengl_3dfx_mode = 1;
             handled = 1;
         } else if (strcasecmp(argv[i], "--no-music") == 0) {
             harness_game_config.no_music = 1;

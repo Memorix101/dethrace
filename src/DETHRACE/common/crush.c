@@ -1133,7 +1133,7 @@ int DoCrashEarnings(tCar_spec* pCar1, tCar_spec* pCar2) {
                 total_units_of_damage += victim->damage_units[i].damage_level - victim->damage_units[i].last_level;
             }
             if (culprit->damage_units[i].damage_level > culprit->damage_units[i].last_level) {
-                culprit->damage_units[i].damage_level = (culprit->damage_units[i].damage_level - culprit->damage_units[i].last_level) * 0.1f + (float)culprit->damage_units[i].last_level;
+                culprit->damage_units[i].damage_level = (culprit->damage_units[i].damage_level - culprit->damage_units[i].last_level) * 0.1f + (double)culprit->damage_units[i].last_level;
                 if (culprit->damage_units[i].damage_level < 0) {
                     culprit->damage_units[i].damage_level = 0;
                 }

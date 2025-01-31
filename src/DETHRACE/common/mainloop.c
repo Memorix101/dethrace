@@ -143,7 +143,7 @@ void MungeHeadups(void) {
     LOG_TRACE("()");
 
     ClearHeadupSlot(3);
-    gMr_odo = (float)gFrame_period * gProgram_state.current_car.speedo_speed * WORLD_SCALE / 1600.0 + gMr_odo;
+    gMr_odo = (double)gFrame_period * gProgram_state.current_car.speedo_speed * WORLD_SCALE / 1600.0 + gMr_odo;
     if (gInfo_on) {
         bearing = 360.0 - FastScalarArcTan2(gCamera_to_world.m[0][2], gCamera_to_world.m[2][2]);
         if (gInfo_mode) {
@@ -174,21 +174,21 @@ void MungeHeadups(void) {
         ChangeHeadupText(gProgram_state.frame_rate_headup, "");
     }
     net_credits = gProgram_state.credits_earned - gProgram_state.credits_lost;
-    if (fabs((float)(gProgram_state.credits_earned - gProgram_state.credits_lost) - (float)gLast_credit_headup__mainloop) / (float)gFrame_period > 1.2) {
+    if (fabs((double)(gProgram_state.credits_earned - gProgram_state.credits_lost) - (double)gLast_credit_headup__mainloop) / (double)gFrame_period > 1.2) {
         if (net_credits - gLast_credit_headup__mainloop <= 0) {
-            net_credits = (float)gLast_credit_headup__mainloop
-                - ((float)(gLast_credit_headup__mainloop - net_credits) + 1000.0)
-                    * (float)gFrame_period
+            net_credits = (double)gLast_credit_headup__mainloop
+                - ((double)(gLast_credit_headup__mainloop - net_credits) + 1000.0)
+                    * (double)gFrame_period
                     * 1.2
                     / 1000.0;
         } else {
-            net_credits = (net_credits - gLast_credit_headup__mainloop) + 1000.0 * (float)gFrame_period * 1.2 / 1000.0
-                + (float)gLast_credit_headup__mainloop;
+            net_credits = (net_credits - gLast_credit_headup__mainloop) + 1000.0 * (double)gFrame_period * 1.2 / 1000.0
+                + (double)gLast_credit_headup__mainloop;
         }
     }
     gLast_credit_headup__mainloop = net_credits;
     if (gCountdown) {
-        new_countdown = 7.5 - (float)GetRaceTime() / 1000.0;
+        new_countdown = 7.5 - (double)GetRaceTime() / 1000.0;
         if (new_countdown < 0) {
             new_countdown = 0;
         }
@@ -201,7 +201,7 @@ void MungeHeadups(void) {
             }
         }
     }
-    if (fabs((float)gTimer - (float)gLast_time_headup) / (float)gFrame_period <= 10.0) {
+    if (fabs((double)gTimer - (double)gLast_time_headup) / (double)gFrame_period <= 10.0) {
         effective_timer = gTimer;
     } else if (gTimer - gLast_time_headup <= 0) {
         effective_timer = gTimer;

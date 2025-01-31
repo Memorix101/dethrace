@@ -1,5 +1,6 @@
 /build*
 .DS_Store
 .vscode
+/linux_build
 *.Identifier
 /src/DETHRACE/CMakeFiles

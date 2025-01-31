@@ -17,6 +17,7 @@
 #include "flicplay.h"
 #include "formats.h"
 #include "globvars.h"
+#include "globvrbm.h"
 #include "globvrkm.h"
 #include "globvrpb.h"
 #include "grafdata.h"
@@ -348,7 +349,7 @@ void LoadGeneralParameters(void) {
     int temp;
     char s[256];
     char* str;
-    char *saveptr;
+
     PathCat(the_path, gApplication_path, "ACTORS");
     PathCat(the_path, the_path, "PROG.ACT");
     f = fopen(the_path, "rb");
@@ -430,44 +431,44 @@ void LoadGeneralParameters(void) {
     gOpponent_nastyness_frigger = GetAFloat(f);
     ParseSpecialVolume(f, &gDefault_default_water_spec_vol, gDef_def_water_screen_name);
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < 5; i++) {
         sscanf(str, "%d", &gInitial_net_credits[i]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
     }
 
     gTag_start_time = 1000 * GetAnInt(f);
     gFox_start_time = 1000 * GetAnInt(f);
 
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < 7; i++) {
         sscanf(str, "%f", &gNet_repair_cost[i]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < 7; i++) {
         sscanf(str, "%f", &gNet_recovery_cost[i]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < 7; i++) {
         sscanf(str, "%f", &gNet_softness[i]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < 7; i++) {
         sscanf(str, "%f", &gNet_offensive[i]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < 7; i++) {
         sscanf(str, "%d", &gNet_target[i]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
     }
 
     gMin_respawn_time = 1000 * GetAnInt(f);
@@ -562,7 +563,13 @@ br_material* LoadMaterial(char* pName) {
     PossibleService();
     PathCat(the_path, gApplication_path, "MATERIAL");
     PathCat(the_path, the_path, pName);
-    return BrMaterialLoad(the_path);
+    result = BrMaterialLoad(the_path);
+#ifdef DETHRACE_3DFX_PATCH
+    if (result != NULL) {
+        GlorifyMaterial(&result, 1);
+    }
+#endif
+    return result;
 }
 
 // IDA: br_model* __usercall LoadModel@<EAX>(char *pName@<EAX>)
@@ -574,7 +581,11 @@ br_model* LoadModel(char* pName) {
     PossibleService();
     PathCat(the_path, gApplication_path, "MODELS");
     PathCat(the_path, the_path, pName);
-    return BrModelLoad(the_path);
+    model = BrModelLoad(the_path);
+#ifdef DETHRACE_3DFX_PATCH
+    WhitenVertexRGB(&model, 1);
+#endif
+    return model;
 }
 
 // IDA: br_actor* __usercall LoadActor@<EAX>(char *pName@<EAX>)
@@ -637,6 +648,9 @@ void DRLoadMaterials(char* pPath_name) {
 
     PossibleService();
     number_of_materials = BrMaterialLoadMany(pPath_name, material_array, COUNT_OF(material_array));
+#ifdef DETHRACE_3DFX_PATCH
+    GlorifyMaterial(material_array, number_of_materials);
+#endif
     BrMaterialAddMany(material_array, number_of_materials);
 }
 
@@ -648,6 +662,9 @@ void DRLoadModels(char* pPath_name) {
 
     PossibleService();
     number_of_models = BrModelLoadMany(pPath_name, model_array, COUNT_OF(model_array));
+#ifdef DETHRACE_3DFX_PATCH
+    WhitenVertexRGB(model_array, number_of_models);
+#endif
     BrModelAddMany(model_array, number_of_models);
 }
 
@@ -698,6 +715,9 @@ void LoadInRegisteeDir(char* pThe_dir_path) {
     PathCat(reg_path, pThe_dir_path, "REG");
     LoadInFiles(reg_path, "PALETTES", DRLoadPalette);
     LoadInFiles(reg_path, "SHADETAB", DRLoadShadeTable);
+#ifdef DETHRACE_3DFX_PATCH
+    InitializePalettes();
+#endif
     LoadInFiles(reg_path, "PIXELMAP", DRLoadPixelmaps);
     LoadInFiles(reg_path, "MATERIAL", DRLoadMaterials);
     LoadInFiles(reg_path, "MODELS", DRLoadModels);
@@ -812,7 +832,60 @@ tS8* ConvertPixTo16BitStripMap(br_pixelmap* pBr_map) {
     tU8 byte;
     tU16* palette_entry;
     LOG_TRACE("(%p)", pBr_map);
-    NOT_IMPLEMENTED();
+
+    palette_entry = PaletteOf16Bits(gRender_palette)->pixels;
+    max_line_bytes = 125 * ((pBr_map->width + 61) / 62) + 2;
+    new_line = BrMemAllocate(max_line_bytes, kMem_strip_image);
+    temp_strip_image = BrMemAllocate(max_line_bytes * pBr_map->height, kMem_strip_image);
+    current_size = 2;
+    i = 0;
+    *(tU16*)temp_strip_image = pBr_map->height;
+    for (i = 0; i < pBr_map->height; i++) {
+        new_line_length = 2;
+        counting_blanks = 0;
+        next_byte = (tU8*)pBr_map->pixels + i * pBr_map->row_bytes;
+        if (*next_byte == 0) {
+            counting_blanks = 1;
+        }
+        counter = 0;
+        chunk_counter = 0;
+        j = 0;
+        while (1) {
+            while (counter < 62) {
+                if (j == pBr_map->width)
+                    break;
+                byte = *next_byte;
+                if (counting_blanks != (*next_byte == 0))
+                    break;
+                if (!counting_blanks) {
+                    *(tU16*)&new_line[new_line_length] = palette_entry[byte];
+                    new_line_length += 2;
+                }
+                next_byte++;
+                counter++;
+                j++;
+            }
+            if (counting_blanks) {
+                new_line[new_line_length - 1] = 2 * counter;
+            } else {
+                new_line[new_line_length - 2 * counter - 1] = -2 * counter;
+            }
+            counting_blanks = byte == 0;
+            ++chunk_counter;
+            counter = 0;
+            if (j == pBr_map->width) {
+                break;
+            }
+            new_line_length++;
+        }
+        *new_line = chunk_counter;
+        memcpy(temp_strip_image + current_size, new_line, new_line_length);
+        current_size += new_line_length;
+    }
+    strip_image = BrMemAllocate(current_size, kMem_strip_image_perm);
+    memcpy(strip_image, temp_strip_image, current_size);
+    BrMemFree(temp_strip_image);
+    return strip_image;
 }
 
 // IDA: tS8* __usercall ConvertPixToStripMap@<EAX>(br_pixelmap *pThe_br_map@<EAX>)
@@ -845,7 +918,7 @@ tS8* ConvertPixToStripMap(br_pixelmap* pThe_br_map) {
     temp_strip_image = BrMemAllocate(pThe_br_map->row_bytes * pThe_br_map->height, kMem_strip_image);
     current_size = 2;
 
-    *(br_uint_16*)temp_strip_image = pThe_br_map->height;
+    *(tU16*)temp_strip_image = pThe_br_map->height;
     current_strip_pointer = temp_strip_image;
 
     for (i = 0; i < pThe_br_map->height; i++) {
@@ -1077,46 +1150,46 @@ void LoadSpeedo(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
     char the_char1;
     char the_char2;
     LOG_TRACE("(%p, %d, %p)", pF, pIndex, pCar_spec);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%c", &the_char1);
     if (the_char1 == 'd') {
         pCar_spec->speedo_radius_2[pIndex] = -1;
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_x[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_y[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         pCar_spec->speedo_image[pIndex] = LoadPixelmap(str);
         if (!pCar_spec->speedo_image[pIndex]) {
             FatalError(kFatalError_LoadSpeedoImage);
         }
         pCar_spec->speedo_y_pitch[pIndex] = pCar_spec->speedo_image[pIndex]->height / 10;
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_x_pitch[pIndex]);
     } else {
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_x[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_y[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         pCar_spec->speedo_image[pIndex] = LoadPixelmap(str);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_centre_x[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_centre_y[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_radius_1[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_radius_2[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_start_angle[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_end_angle[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->speedo_needle_colour[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->max_speed);
     }
 }
@@ -1129,38 +1202,38 @@ void LoadTacho(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
     char the_char1;
     char the_char2;
     LOG_TRACE("(%p, %d, %p)", pF, pIndex, pCar_spec);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%c", &the_char1);
     if (the_char1 == 'd') {
         pCar_spec->tacho_radius_2[pIndex] = -1;
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->tacho_x[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->tacho_y[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         pCar_spec->tacho_image[pIndex] = LoadPixelmap(str);
     } else {
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->tacho_x[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->tacho_y[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         pCar_spec->tacho_image[pIndex] = LoadPixelmap(str);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->tacho_centre_x[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->tacho_centre_y[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->tacho_radius_1[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->tacho_radius_2[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->tacho_start_angle[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->tacho_end_angle[pIndex]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->tacho_needle_colour[pIndex]);
     }
 }
@@ -1172,17 +1245,17 @@ void LoadHeadups(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
     int j;
     int number_of_slots;
     LOG_TRACE("(%p, %d, %p)", pF, pIndex, pCar_spec);
-    char *saveptr;
+
     number_of_slots = GetAnInt(pF);
     for (j = 0; j < number_of_slots; j++) {
         GetALineAndDontArgue(pF, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].x);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].y);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].colour);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         strcpy(s, str);
         switch (s[0]) {
         case 'c':
@@ -1198,17 +1271,17 @@ void LoadHeadups(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
         if (s[1] == 'c') {
             pCar_spec->headup_slots[pIndex][j].cockpit_anchored = 1;
         }
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].dim_left);
         if (pCar_spec->headup_slots[pIndex][j].dim_left < 0) {
             pCar_spec->headup_slots[pIndex][j].dimmed_background = 0;
         } else {
             pCar_spec->headup_slots[pIndex][j].dimmed_background = 1;
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].dim_top);
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].dim_right);
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].dim_bottom);
         }
     }
@@ -1376,11 +1449,11 @@ void ReadMechanicsData(FILE* pF, tCar_spec* c) {
     }
 
     speed = speed * 4.0 / 9.0;
-    c->speed_revs_ratio = speed / (float)c->max_gear / 6000.0;
-    c->force_torque_ratio = (float)c->max_gear * c->M * force;
-    c->mu[1] = tanf(theta_front * 3.14 / 180.0) / 4.0;
-    c->mu[0] = tanf(theta_back * 3.14 / 180.0) / 4.0;
-    c->mu[2] = tanf(theta_comp * 3.14 / 180.0) / 4.0;
+    c->speed_revs_ratio = speed / (double)c->max_gear / 6000.0;
+    c->force_torque_ratio = (double)c->max_gear * c->M * force;
+    c->mu[1] = tan(theta_front * 3.14 / 180.0) / 4.0;
+    c->mu[0] = tan(theta_back * 3.14 / 180.0) / 4.0;
+    c->mu[2] = tan(theta_comp * 3.14 / 180.0) / 4.0;
 
     c->mu[0] *= sqrt((c->wpos[2].v[2] - c->cmpos.v[2]) / (c->wpos[2].v[2] - c->wpos[0].v[2]) * (c->M * 5.0));
     c->mu[1] *= sqrt((c->wpos[0].v[2] - c->cmpos.v[2]) / (c->wpos[0].v[2] - c->wpos[2].v[2]) * (c->M * 5.0));
@@ -1453,13 +1526,13 @@ void LoadGear(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
     char s[256];
     char* str;
     LOG_TRACE("(%p, %d, %p)", pF, pIndex, pCar_spec);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", &pCar_spec->gear_x[pIndex]);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%d", &pCar_spec->gear_y[pIndex]);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     if (!pIndex) {
         pCar_spec->gears_image = LoadPixelmap(str);
     }
@@ -1485,7 +1558,7 @@ void GetDamageProgram(FILE* pF, tCar_spec* pCar_spec, tImpact_location pImpact_l
     char delim[64];
     char* str;
     LOG_TRACE("(%p, %p, %d)", pF, pCar_spec, pImpact_location);
-    char *saveptr;
+
     PossibleService();
     count = GetAnInt(pF);
     pCar_spec->damage_programs[pImpact_location].clause_count = count;
@@ -1497,7 +1570,7 @@ void GetDamageProgram(FILE* pF, tCar_spec* pCar_spec, tImpact_location pImpact_l
         the_clause = &pCar_spec->damage_programs[pImpact_location].clauses[i];
         the_clause->condition_count = 0;
         GetALineAndDontArgue(pF, s);
-        str = strtok_r(s, delim, &saveptr);
+        str = strtok(s, delim);
         do {
             switch (str[0]) {
             case 'x':
@@ -1521,14 +1594,14 @@ void GetDamageProgram(FILE* pF, tCar_spec* pCar_spec, tImpact_location pImpact_l
             }
             sscanf(str + 2, "%f", &the_clause->conditions[the_clause->condition_count].comparitor);
             the_clause->condition_count++;
-            str = strtok_r(0, delim, &saveptr);
+            str = strtok(NULL, delim);
         } while (the_clause->condition_count < 2);
     LABEL_17:
         the_clause->effect_count = GetAnInt(pF);
         for (j = 0; j < the_clause->effect_count; j++) {
             the_clause->effects[j].type = -1;
             GetALineAndDontArgue(pF, s);
-            str = strtok_r(s, "\t ,/", &saveptr);
+            str = strtok(s, "\t ,/");
             for (k = 0; k < COUNT_OF(gDamage_names); k++) {
                 if (strcmp(str, gDamage_names[k]) == 0) {
                     the_clause->effects[j].type = k;
@@ -1538,7 +1611,7 @@ void GetDamageProgram(FILE* pF, tCar_spec* pCar_spec, tImpact_location pImpact_l
             if (the_clause->effects[j].type < 0) {
                 FatalError(kFatalError_UnknownDamageType_S, str);
             }
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             sscanf(str, "%f", &the_clause->effects[j].weakness_factor);
         }
         ++the_clause;
@@ -1703,14 +1776,19 @@ void SetModelFlags(br_model* pModel, int pOwner) {
 #else
         if (pOwner == OPPONENT_APC_IDX || gAusterity_mode) {
 #endif
-            if ((pModel->flags & BR_MODF_UPDATEABLE) != 0) {
-                pModel->flags &= ~(BR_MODF_KEEP_ORIGINAL | BR_MODF_UPDATEABLE);
-                BrModelUpdate(pModel, BR_MODU_ALL);
+#ifdef DETHRACE_3DFX_PATCH
+            if (!gMaterial_fogging)
+#endif
+            {
+                if ((pModel->flags & BR_MODF_UPDATEABLE) != 0) {
+                    pModel->flags &= ~(BR_MODF_KEEP_ORIGINAL | BR_MODF_UPDATEABLE);
+                    BrModelUpdate(pModel, BR_MODU_ALL);
+                }
+                return;
             }
-        } else {
-            pModel->flags |= BR_MODF_DONT_WELD | BR_MODF_KEEP_ORIGINAL | BR_MODF_UPDATEABLE;
-            BrModelUpdate(pModel, BR_MODU_ALL);
         }
+        pModel->flags |= BR_MODF_DONT_WELD | BR_MODF_KEEP_ORIGINAL | BR_MODF_UPDATEABLE;
+        BrModelUpdate(pModel, BR_MODU_ALL);
     }
 }
 
@@ -1742,7 +1820,6 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
     int v_num;
     int group;
     int vertex_total;
-    char *saveptr;
     LOG_TRACE("(\"%s\", %d, %p, %d, \"%s\", %p)", pCar_name, pDriver, pCar_spec, pOwner, pDriver_name, pStorage_space);
 
     if (pDriver == eDriver_local_human) {
@@ -1830,24 +1907,32 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
     if (pDriver == eDriver_local_human) {
         for (j = 0; j < COUNT_OF(pCar_spec->cockpit_images); j++) {
             GetALineAndDontArgue(g, s);
-            str = strtok_r(s, "\t ,/", &saveptr);
+            str = strtok(s, "\t ,/");
             if (gAusterity_mode) {
                 pCar_spec->cockpit_images[j] = NULL;
             } else {
                 the_image = LoadPixelmap(str);
-                if (the_image == NULL)
+                if (the_image == NULL) {
                     FatalError(kFatalError_LoadCockpitImage);
-                pCar_spec->cockpit_images[j] = ConvertPixToStripMap(the_image);
+                }
+#ifdef DETHRACE_3DFX_PATCH
+                if (gBack_screen->type == BR_PMT_RGB_565) {
+                    pCar_spec->cockpit_images[j] = ConvertPixTo16BitStripMap(the_image);
+                } else
+#endif
+                {
+                    pCar_spec->cockpit_images[j] = ConvertPixToStripMap(the_image);
+                }
                 BrPixelmapFree(the_image);
             }
             GetALineAndDontArgue(g, s);
-            str = strtok_r(s, "\t ,/", &saveptr);
+            str = strtok(s, "\t ,/");
             sscanf(str, "%d", &pCar_spec->render_left[j]);
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             sscanf(str, "%d", &pCar_spec->render_top[j]);
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             sscanf(str, "%d", &pCar_spec->render_right[j]);
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             sscanf(str, "%d", &pCar_spec->render_bottom[j]);
             PossibleService();
         }
@@ -1873,21 +1958,21 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         }
         PossibleService();
         GetALineAndDontArgue(g, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         sscanf(str, "%d", &pCar_spec->number_of_hands_images);
         for (j = 0; j < pCar_spec->number_of_hands_images; j++) {
             GetALineAndDontArgue(g, s);
-            str = strtok_r(s, "\t ,/", &saveptr);
+            str = strtok(s, "\t ,/");
             sscanf(str, "%d", &pCar_spec->lhands_x[j]);
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             sscanf(str, "%d", &pCar_spec->lhands_y[j]);
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             pCar_spec->lhands_images[j] = LoadPixelmap(str);
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             sscanf(str, "%d", &pCar_spec->rhands_x[j]);
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             sscanf(str, "%d", &pCar_spec->rhands_y[j]);
-            str = strtok_r(0, "\t ,/", &saveptr);
+            str = strtok(NULL, "\t ,/");
             if (!gAusterity_mode) {
                 pCar_spec->rhands_images[j] = LoadPixelmap(str);
             }
@@ -1895,53 +1980,53 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         }
         pCar_spec->red_line = 8000;
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         sscanf(str, "%f", &pCar_spec->driver_x_offset);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%f", &pCar_spec->driver_y_offset);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%f", &pCar_spec->driver_z_offset);
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         sscanf(str, "%f", &pCar_spec->head_left_angle);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%f", &pCar_spec->head_right_angle);
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         sscanf(str, "%f", &pCar_spec->mirror_x_offset);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%f", &pCar_spec->mirror_y_offset);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%f", &pCar_spec->mirror_z_offset);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%f", &pCar_spec->rearview_camera_angle);
         GetALineAndDontArgue(g, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         sscanf(str, "%d", &pCar_spec->mirror_left);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->mirror_top);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->mirror_right);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->mirror_bottom);
         GetALineAndDontArgue(g, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         sscanf(str, "%d", &pCar_spec->prat_left);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->prat_top);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->prat_right);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->prat_bottom);
         GetALineAndDontArgue(f, s);
         PossibleService();
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         pCar_spec->prat_cam_left = LoadPixelmap(str);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         pCar_spec->prat_cam_top = LoadPixelmap(str);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         pCar_spec->prat_cam_right = LoadPixelmap(str);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         pCar_spec->prat_cam_bottom = LoadPixelmap(str);
         PossibleService();
         for (j = 0; j < COUNT_OF(pCar_spec->damage_units); ++j) {
@@ -1949,17 +2034,17 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
                 pCar_spec->damage_units[eDamage_driver].images = NULL;
             } else {
                 GetALineAndDontArgue(g, s);
-                str = strtok_r(s, "\t ,/", &saveptr);
+                str = strtok(s, "\t ,/");
                 sscanf(str, "%d", &pCar_spec->damage_units[j].x_coord);
-                str = strtok_r(0, "\t ,/", &saveptr);
+                str = strtok(NULL, "\t ,/");
                 sscanf(str, "%d", &pCar_spec->damage_units[j].y_coord);
                 for (k = 0; k < COUNT_OF(pCar_spec->damage_units[j].periods); k++) {
-                    str = strtok_r(0, "\t ,/", &saveptr);
+                    str = strtok(NULL, "\t ,/");
                     sscanf(str, "%f", &temp_float);
                     rate = 1000.0 / temp_float / 2.0;
                     pCar_spec->damage_units[j].periods[k] = rate;
                 }
-                str = strtok_r(0, "\t ,/", &saveptr);
+                str = strtok(NULL, "\t ,/");
                 pCar_spec->damage_units[j].images = LoadPixelmap(str);
                 if (pCar_spec->damage_units[j].images == NULL)
                     FatalError(kFatalError_LoadDamageImage);
@@ -1968,15 +2053,15 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
             PossibleService();
         }
         GetALineAndDontArgue(g, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         sscanf(str, "%d", &pCar_spec->damage_x_offset);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->damage_y_offset);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->damage_background_x);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &pCar_spec->damage_background_y);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         pCar_spec->damage_background = LoadPixelmap(str);
 
         for (i = 0; i < COUNT_OF(pCar_spec->dim_count); i++) {
@@ -2007,17 +2092,17 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         }
         for (i = 0; i < COUNT_OF(pCar_spec->power_ups); ++i) {
             GetALineAndDontArgue(h, s);
-            str = strtok_r(s, "\t ,/", &saveptr);
+            str = strtok(s, "\t ,/");
             sscanf(str, "%d", &pCar_spec->power_ups[i].number_of_parts);
             for (j = 0; j < pCar_spec->power_ups[i].number_of_parts; j++) {
                 GetALineAndDontArgue(h, s);
-                str = strtok_r(s, "\t ,/", &saveptr);
+                str = strtok(s, "\t ,/");
                 sscanf(str, "%d", &pCar_spec->power_ups[i].info[j].rank_required);
-                str = strtok_r(0, "\t ,/", &saveptr);
+                str = strtok(NULL, "\t ,/");
                 strcpy(pCar_spec->power_ups[i].info[j].part_name, str);
                 pCar_spec->power_ups[i].info[j].data_ptr = NULL;
                 for (k = 0; k < COUNT_OF(pCar_spec->power_ups[i].info[j].prices); k++) {
-                    str = strtok_r(0, "\t ,/", &saveptr);
+                    str = strtok(NULL, "\t ,/");
                     sscanf(str, "%d", &pCar_spec->power_ups[i].info[j].prices[k]);
                 }
             }
@@ -2049,11 +2134,11 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
     GetDamageProgram(f, pCar_spec, eImpact_front);
     GetDamageProgram(f, pCar_spec, eImpact_back);
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     strcpy(pCar_spec->grid_icon_names[0], str);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     strcpy(pCar_spec->grid_icon_names[1], str);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     strcpy(pCar_spec->grid_icon_names[2], str);
     pCar_spec->grid_icon_image = NULL;
     if (gAusterity_mode) {
@@ -2118,13 +2203,13 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         BrActorAdd(gNon_track_actor, pCar_spec->car_master_actor);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", &pCar_spec->car_actor_count);
     pCar_spec->principal_car_actor = 0;
     for (i = 0; i < pCar_spec->car_actor_count; i++) {
         PossibleService();
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         sscanf(str, "%f", &temp_float);
         if (temp_float < 0.f && pDriver != eDriver_local_human) {
             FreeUpBonnetModels(&pStorage_space->models[old_model_count], pStorage_space->models_count - old_model_count);
@@ -2136,7 +2221,7 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         } else {
             pCar_spec->car_model_actors[i].min_distance_squared = temp_float;
         }
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         PathCat(the_path, gApplication_path, "ACTORS");
         PathCat(the_path, the_path, str);
         pCar_spec->car_model_actors[i].actor = BrActorLoad(the_path);
@@ -2176,42 +2261,42 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         MungeWindscreen(pCar_spec->car_model_actors[pCar_spec->principal_car_actor].actor->model);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", &pCar_spec->number_of_steerable_wheels);
     for (i = 0; i < pCar_spec->number_of_steerable_wheels; i++) {
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         sscanf(str, "%d", &pCar_spec->steering_ref[i]);
         AddRefOffset(&pCar_spec->steering_ref[i]);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < COUNT_OF(pCar_spec->lf_sus_ref); i++) {
         sscanf(str, "%d", &pCar_spec->lf_sus_ref[i]);
         AddRefOffset(&pCar_spec->lf_sus_ref[i]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
     }
     PossibleService();
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < COUNT_OF(pCar_spec->rf_sus_ref); i++) {
         sscanf(str, "%d", &pCar_spec->rf_sus_ref[i]);
         AddRefOffset(&pCar_spec->rf_sus_ref[i]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < COUNT_OF(pCar_spec->lr_sus_ref); i++) {
         sscanf(str, "%d", &pCar_spec->lr_sus_ref[i]);
         AddRefOffset(&pCar_spec->lr_sus_ref[i]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < COUNT_OF(pCar_spec->rr_sus_ref); i++) {
         sscanf(str, "%d", &pCar_spec->rr_sus_ref[i]);
         AddRefOffset(&pCar_spec->rr_sus_ref[i]);
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
     }
     GetFourInts(
         f,
@@ -2235,11 +2320,11 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
     AddRefOffset(&pCar_spec->non_driven_wheels_spin_ref_3);
     AddRefOffset(&pCar_spec->non_driven_wheels_spin_ref_4);
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%f", &temp_float);
     pCar_spec->driven_wheels_circum = temp_float * 2.f * DR_PI;
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%f", &temp_float);
     pCar_spec->non_driven_wheels_circum = temp_float * 2.f * DR_PI;
     pCar_spec->car_model_variable = pDriver != eDriver_local_human;
@@ -2561,28 +2646,20 @@ void LoadRaceInfo(int pRace_index, tRace_info* pRace_info) {
     pRace_info->best_rank = gRace_list[pRace_index].best_rank;
     pRace_info->suggested_rank = gRace_list[pRace_index].suggested_rank;
     GetALineAndDontArgue(f, s);
-    printf("s = %s\n", s);
-    char *saveptr;
-    str = strtok_r(s, "\t ,/", &saveptr);
-    // str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     pRace_info->scene_image_data = NULL;
     pRace_info->map_image_data = NULL;
     pRace_info->info_image_data = NULL;
     PossibleService();
     if (!gNet_mode) {
-        printf("racesceeneimage = %s\n", str);
         if (!LoadFlicData(str, &pRace_info->scene_image_data, &pRace_info->scene_image_data_length)) {
             FatalError(kFatalError_LoadRaceSceneImage);
         }
-        // str = strtok(0, "\t ,/");
-        str = strtok_r(0, "\t ,/", &saveptr);
-                printf("LoadRaceMapImage = %s\n", str);
+        str = strtok(0, "\t ,/");
         if (!LoadFlicData(str, &pRace_info->map_image_data, &pRace_info->map_image_data_length)) {
             FatalError(kFatalError_LoadRaceMapImage);
         }
-        // str = strtok(0, "\t ,/");
-        str = strtok_r(0, "\t ,/", &saveptr);
-        printf("loadRaceInfoImage = %s\n", str);
+        str = strtok(0, "\t ,/");
         if (!LoadFlicData(str, &pRace_info->info_image_data, &pRace_info->info_image_data_length)) {
             FatalError(kFatalError_loadRaceInfoImage);
         }
@@ -2592,7 +2669,7 @@ void LoadRaceInfo(int pRace_index, tRace_info* pRace_info) {
         }
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     strcpy(pRace_info->track_file_name, str);
     pRace_info->text_chunk_count = GetAnInt(f);
     pRace_info->text_chunks = BrMemAllocate(sizeof(tText_chunk) * pRace_info->text_chunk_count, kMem_race_text_chunk);
@@ -2692,14 +2769,14 @@ void LoadOpponents(void) {
     char* str;
     tText_chunk* the_chunk;
     LOG_TRACE("()");
-    char *saveptr;
+
     PathCat(the_path, gApplication_path, "OPPONENT.TXT");
     f = DRfopen(the_path, "rt");
     if (f == NULL) {
         FatalError(kFatalError_OpenOpponentsFile);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", &gNumber_of_racers);
     gOpponents = BrMemAllocate(sizeof(tOpponent) * gNumber_of_racers, kMem_oppo_array);
 
@@ -2716,7 +2793,7 @@ void LoadOpponents(void) {
         gOpponents[i].network_availability = GetALineAndInterpretCommand(f, gNet_avail_names, COUNT_OF(gNet_avail_names));
 
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         strcpy(gOpponents[i].mug_shot_name, str);
 
         gOpponents[i].mug_shot_image_data = NULL;
@@ -2724,10 +2801,10 @@ void LoadOpponents(void) {
         gOpponents[i].stolen_car_image_data = NULL;
 
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         strcpy(gOpponents[i].car_file_name, str);
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         strcpy(gOpponents[i].stolen_car_flic_name, str);
 
         gOpponents[i].text_chunk_count = GetAnInt(f);
@@ -2874,10 +2951,10 @@ int GetALineAndInterpretCommand(FILE* pF, char** pString_list, int pCount) {
     int i;
     char s[256];
     char* str;
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
 
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < pCount; i++) {
         if (strcmp(str, pString_list[i]) == 0) {
             return i;
@@ -2891,9 +2968,9 @@ int GetAnInt(FILE* pF) {
     char s[256];
     char* str;
     int result;
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", &result);
     return result;
 }
@@ -2903,9 +2980,9 @@ float GetAFloat(FILE* pF) {
     char s[256];
     char* str;
     float result;
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%f", &result);
     return result;
 }
@@ -2916,9 +2993,9 @@ float GetAFloatPercent(FILE* pF) {
     char* str;
     float result;
     LOG_TRACE("(%p)", pF);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%f", &result);
     return result / 100.f;
 }
@@ -2927,11 +3004,11 @@ float GetAFloatPercent(FILE* pF) {
 void GetPairOfFloats(FILE* pF, float* pF1, float* pF2) {
     char s[256];
     char* str;
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%f", pF1);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%f", pF2);
 }
 
@@ -2939,13 +3016,13 @@ void GetPairOfFloats(FILE* pF, float* pF1, float* pF2) {
 void GetThreeFloats(FILE* pF, float* pF1, float* pF2, float* pF3) {
     char s[256];
     char* str;
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%f", pF1);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%f", pF2);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%f", pF3);
 }
 
@@ -2953,11 +3030,11 @@ void GetThreeFloats(FILE* pF, float* pF1, float* pF2, float* pF3) {
 void GetPairOfInts(FILE* pF, int* pF1, int* pF2) {
     char s[256];
     char* str;
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", pF1);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%d", pF2);
 }
 
@@ -2965,13 +3042,13 @@ void GetPairOfInts(FILE* pF, int* pF1, int* pF2) {
 void GetThreeInts(FILE* pF, int* pF1, int* pF2, int* pF3) {
     char s[256];
     char* str;
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", pF1);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%d", pF2);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%d", pF3);
 }
 
@@ -2980,15 +3057,15 @@ void GetThreeIntsAndAString(FILE* pF, int* pF1, int* pF2, int* pF3, char* pS) {
     char s[256];
     char* str;
     LOG_TRACE("(%p, %p, %p, %p, \"%s\")", pF, pF1, pF2, pF3, pS);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", pF1);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%d", pF2);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%d", pF3);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     strcpy(pS, str);
 }
 
@@ -2996,15 +3073,15 @@ void GetThreeIntsAndAString(FILE* pF, int* pF1, int* pF2, int* pF3, char* pS) {
 void GetFourInts(FILE* pF, int* pF1, int* pF2, int* pF3, int* pF4) {
     char s[256];
     char* str;
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", pF1);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%d", pF2);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%d", pF3);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%d", pF4);
 }
 
@@ -3038,15 +3115,15 @@ void GetFourScalars(FILE* pF, br_scalar* pF1, br_scalar* pF2, br_scalar* pF3, br
     float f3;
     float f4;
     LOG_TRACE("(%p, %p, %p, %p, %p)", pF, pF1, pF2, pF3, pF4);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%f", &f1);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%f", &f2);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%f", &f3);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%f", &f4);
     *pF1 = f1;
     *pF2 = f2;
@@ -3074,13 +3151,13 @@ void GetNScalars(FILE* pF, int pNumber, br_scalar* pScalars) {
     float fleurting_point_numero;
     int i;
     LOG_TRACE("(%p, %d, %p)", pF, pNumber, pScalars);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     for (i = 0; i < pNumber; i++) {
         sscanf(str, "%f", &fleurting_point_numero);
         pScalars[i] = fleurting_point_numero;
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
     }
 }
 
@@ -3089,11 +3166,11 @@ void GetPairOfFloatPercents(FILE* pF, float* pF1, float* pF2) {
     char s[256];
     char* str;
     LOG_TRACE("(%p, %p, %p)", pF, pF1, pF2);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%f", pF1);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%f", pF2);
     *pF1 = *pF1 / 100.0f;
     *pF2 = *pF2 / 100.0f;
@@ -3104,13 +3181,13 @@ void GetThreeFloatPercents(FILE* pF, float* pF1, float* pF2, float* pF3) {
     char s[256];
     char* str;
     LOG_TRACE("(%p, %p, %p, %p)", pF, pF1, pF2, pF3);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%f", pF1);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%f", pF2);
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(NULL, "\t ,/");
     sscanf(str, "%f", pF3);
     *pF1 = *pF1 / 100.0f;
     *pF2 = *pF2 / 100.0f;
@@ -3121,9 +3198,9 @@ void GetThreeFloatPercents(FILE* pF, float* pF1, float* pF2, float* pF3) {
 void GetAString(FILE* pF, char* pString) {
     char s[256];
     char* str;
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     strcpy(pString, str);
 }
 
@@ -3563,7 +3640,7 @@ int RestoreOptions(void) {
     char* s;
     float arg;
     LOG_TRACE("()");
-    char *saveptr;
+
     gProgram_state.music_volume = 4;
     gProgram_state.effects_volume = 4;
     DefaultNetSettings();
@@ -3612,7 +3689,7 @@ int RestoreOptions(void) {
                 gMap_render_height = arg;
             } else if (!strcmp(token, "PlayerName")) {
                 fgets(line, 80, f);
-                s = strtok_r(line, "\n\r", &saveptr);
+                s = strtok(line, "\n\r");
                 strcpy(gProgram_state.player_name[(int)arg], s);
             } else if (!strcmp(token, "EVolume")) {
                 gProgram_state.effects_volume = (int)arg;
@@ -3638,7 +3715,7 @@ int RestoreOptions(void) {
                 gJoystick_range2y = (int)arg;
             } else if (!strcmp(token, "NetName")) {
                 fgets(line, 80, f);
-                 s = strtok_r(line, "\n\r", &saveptr);
+                s = strtok(line, "\n\r");
                 strcpy(gNet_player_name, s);
             } else if (!strcmp(token, "NETGAMETYPE")) {
                 gLast_game_type = (tNet_game_type)arg;

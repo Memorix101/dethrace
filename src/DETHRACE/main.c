@@ -37,10 +37,13 @@ extern int original_main(int pArgc, char* pArgv[]);
 void BR_CALLBACK _BrBeginHook(void) {
     struct br_device* BR_EXPORT BrDrv1SoftPrimBegin(char* arguments);
     struct br_device* BR_EXPORT BrDrv1SoftRendBegin(char* arguments);
+    struct br_device* BR_EXPORT BrDrv1VirtualFramebufferBegin(char* arguments);
+    struct br_device* BR_EXPORT BrDrv1GLBegin(char* arguments);
 
-    BrDevAddStatic(NULL, (br_device_begin_fn *)BrDrv1SoftPrimBegin, NULL);
-    BrDevAddStatic(NULL, (br_device_begin_fn *)BrDrv1SoftRendBegin, NULL);
-    // BrDevAddStatic(NULL, BrDrv1SDL2Begin, NULL);
+    BrDevAddStatic(NULL, BrDrv1SoftPrimBegin, NULL);
+    BrDevAddStatic(NULL, BrDrv1SoftRendBegin, NULL);
+    BrDevAddStatic(NULL, BrDrv1VirtualFramebufferBegin, NULL);
+    BrDevAddStatic(NULL, BrDrv1GLBegin, NULL);
 }
 
 void BR_CALLBACK _BrEndHook(void) {
@@ -64,9 +67,7 @@ int main(int argc, char* argv[]) {
         }
     }
 #endif
-// #ifdef __DREAMCAST__
-//     fs_chdir("/cd/dethrace");
-// #endif    
+
     Harness_Init(&argc, argv);
 
     return original_main(argc, argv);

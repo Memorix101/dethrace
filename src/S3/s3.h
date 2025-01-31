@@ -55,7 +55,7 @@ char* S3GetCurrentDir(void);
 void S3CalculateRandomizedFields(tS3_channel* chan, tS3_descriptor* desc);
 int S3IRandomBetween(int pMin, int pMax, int pDefault);
 int S3IRandomBetweenLog(int pMin, int pMax, int pDefault);
-float S3FRandomBetween(float pMin, float pMax);
+double S3FRandomBetween(double pMin, double pMax);
 
 int S3GenerateTag(tS3_outlet* outlet);
 int S3ReleaseSound(tS3_sound_id id);

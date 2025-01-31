@@ -18,7 +18,7 @@ typedef uint16_t tU16;
 typedef int16_t tS16;
 typedef uint32_t tU32;
 typedef int32_t tS32;
-typedef float tF64;
+typedef double tF64;
 typedef int16_t tX88;
 typedef int32_t tX1616;
 typedef tU8 tNet_message_type;
@@ -402,9 +402,9 @@ typedef enum tSmear_type {
 typedef struct exception_ {
     int type;
     char* name;
-    float arg1;
-    float arg2;
-    float retval;
+    double arg1;
+    double arg2;
+    double retval;
 } exception_;
 
 typedef struct tTrack_spec {

@@ -6,6 +6,7 @@
 #include "loading.h"
 #include "oil.h"
 #include "piping.h"
+#include "utility.h"
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
@@ -114,7 +115,7 @@ void InitSkids(void) {
     char mat_name[32];
 #endif
     LOG_TRACE("()");
-    char *saveptr;
+
     for (mat = 0; mat < COUNT_OF(gMaterial_names); mat++) {
         if (gProgram_state.sausage_eater_mode) {
             str = gBoring_material_names[mat];
@@ -130,22 +131,33 @@ void InitSkids(void) {
             }
 
 #if defined(DETHRACE_FIX_BUGS)
-            // Avoid modification of read-only data by strtok_r.
+            // Avoid modification of read-only data by strtok.
             strcpy(mat_name, str);
             str = mat_name;
 #endif
-            sl = strlen(strtok_r(str, ".", &saveptr));
-
+            sl = strlen(strtok(str, "."));
             strcpy(str + sl, ".PIX");
             BrMapAdd(LoadPixelmap(str));
             strcpy(str + sl, ".MAT");
             gMaterial[mat] = LoadMaterial(str);
-            if (gMaterial[mat]) {
-                BrMaterialAdd(gMaterial[mat]);
-            } else {
+            if (gMaterial[mat] == NULL) {
                 BrFatal("..\\..\\source\\common\\skidmark.c", 207, "Couldn't find %s", gMaterial_names[mat]);
             }
+#ifdef DETHRACE_3DFX_PATCH
+            GlorifyMaterial(&gMaterial[mat], 1);
+#endif
+            BrMaterialAdd(gMaterial[mat]);
         }
+#ifdef DETHRACE_3DFX_PATCH
+        else {
+
+            BrMapRemove(gMaterial[mat]->colour_map);
+            gMaterial[mat]->colour_map = PurifiedPixelmap(gMaterial[mat]->colour_map);
+            BrMapAdd(gMaterial[mat]->colour_map);
+            GlorifyMaterial(&gMaterial[mat], 1);
+            BrMaterialUpdate(gMaterial[mat], BR_MATU_ALL);
+        }
+#endif
     }
 
     for (skid = 0; skid < COUNT_OF(gSkids); skid++) {

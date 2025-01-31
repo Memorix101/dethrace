@@ -12,6 +12,7 @@
 #include "flicplay.h"
 #include "formats.h"
 #include "globvars.h"
+#include "globvrbm.h"
 #include "globvrpb.h"
 #include "graphics.h"
 #include "harness/trace.h"
@@ -299,12 +300,12 @@ int LoadNPixelmaps(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     char* str;
     br_pixelmap* temp_array[200];
     LOG_TRACE("(%p, %p, %d)", pStorage_space, pF, pCount);
-    char *saveptr;
+
     new_ones = 0;
     for (i = 0; i < pCount; ++i) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         PathCat(the_path, gApplication_path, gGraf_specs[gGraf_spec_index].data_dir_name);
         PathCat(the_path, the_path, "PIXELMAP");
         PathCat(the_path, the_path, str);
@@ -403,12 +404,12 @@ int LoadNShadeTables(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     char* str;
     br_pixelmap* temp_array[50];
     LOG_TRACE("(%p, %p, %d)", pStorage_space, pF, pCount);
-    char *saveptr;
+
     new_ones = 0;
     for (i = 0; i < pCount; i++) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         PathCat(the_path, gApplication_path, "SHADETAB");
         PathCat(the_path, the_path, str);
         total = DRPixelmapLoadMany(the_path, temp_array, 50);
@@ -474,18 +475,21 @@ int LoadNMaterials(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     char* str;
     br_material* temp_array[200];
     LOG_TRACE("(%p, %p, %d)", pStorage_space, pF, pCount);
-    char *saveptr;
+
     new_ones = 0;
     for (i = 0; i < pCount; ++i) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         PathCat(the_path, gApplication_path, "MATERIAL");
         PathCat(the_path, the_path, str);
         total = BrMaterialLoadMany(the_path, temp_array, 200);
         if (total == 0) {
             FatalError(kFatalError_LoadMaterialFile_S, str);
         }
+#ifdef DETHRACE_3DFX_PATCH
+        GlorifyMaterial(temp_array, total);
+#endif
         for (j = 0; j < total; j++) {
             if (temp_array[j]) {
                 switch (AddMaterialToStorage(pStorage_space, temp_array[j])) {
@@ -518,15 +522,18 @@ int LoadNModels(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     struct v11model* prepared;
     int group;
     LOG_TRACE("(%p, %p, %d)", pStorage_space, pF, pCount);
-    char *saveptr;
+
     new_ones = 0;
     for (i = 0; i < pCount; i++) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         PathCat(the_path, gApplication_path, "MODELS");
         PathCat(the_path, the_path, str);
         total = BrModelLoadMany(the_path, temp_array, 2000);
+#ifdef DETHRACE_3DFX_PATCH
+        WhitenVertexRGB(temp_array, total);
+#endif
         if (total == 0) {
             FatalError(kFatalError_LoadModelFile_S, str);
         }
@@ -662,7 +669,27 @@ void ProcessModelFaceMaterials2(br_model* pModel, tPMFM2CB pCallback) {
     tU16 group;
     br_material* old_mat;
     LOG_TRACE("(%p, %d)", pModel, pCallback);
-    NOT_IMPLEMENTED();
+
+    if (pModel->faces) {
+        for (f = 0; f < pModel->nfaces; f++) {
+            if (pModel->faces[f].material) {
+                pCallback(pModel->faces[f].material);
+            }
+        }
+    } else {
+        if (pModel->prepared == NULL) {
+            return;
+        }
+        for (group = 0; group < V11MODEL(pModel)->ngroups; group++) {
+            for (f = 0; f < V11MODEL(pModel)->groups[group].nfaces; f++) {
+                // old_mat = V11MODEL(pModel)->groups[group].face_colours[f];
+                old_mat = V11MODEL(pModel)->groups[group].user;
+                if (old_mat) {
+                    pCallback(old_mat);
+                }
+            }
+        }
+    }
 }
 
 // IDA: void __usercall ProcessModelFaceMaterials(br_model *pModel@<EAX>, tPMFMCB pCallback@<EDX>)
@@ -700,17 +727,20 @@ int LoadNTrackModels(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     br_model* temp_array[2000];
     struct v11model* prepared;
     LOG_TRACE("(%p, %p, %d)", pStorage_space, pF, pCount);
-    char *saveptr;
+
     new_ones = 0;
     for (i = 0; i < pCount; i++) {
         GetALineAndDontArgue(pF, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         PathCat(the_path, gApplication_path, "MODELS");
         PathCat(the_path, the_path, str);
         total = BrModelLoadMany(the_path, temp_array, 2000);
         if (total == 0) {
             FatalError(kFatalError_LoadModelFile_S, str);
         }
+#ifdef DETHRACE_3DFX_PATCH
+        WhitenVertexRGB(temp_array, total);
+#endif
         for (j = 0; j < total; j++) {
             if (temp_array[j]) {
                 switch (AddModelToStorage(pStorage_space, temp_array[j])) {
@@ -756,9 +786,9 @@ void LoadSomePixelmaps(tBrender_storage* pStorage_space, FILE* pF) {
     char* str;
     br_pixelmap* temp_array[200];
     LOG_TRACE("(%p, %p)", pStorage_space, pF);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", &count);
     LoadNPixelmaps(pStorage_space, pF, count);
 }
@@ -774,9 +804,9 @@ void LoadSomeShadeTables(tBrender_storage* pStorage_space, FILE* pF) {
     char* str;
     br_pixelmap* temp_array[50];
     LOG_TRACE("(%p, %p)", pStorage_space, pF);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", &count);
     LoadNShadeTables(pStorage_space, pF, count);
 }
@@ -792,9 +822,9 @@ void LoadSomeMaterials(tBrender_storage* pStorage_space, FILE* pF) {
     char* str;
     br_material* temp_array[200];
     LOG_TRACE("(%p, %p)", pStorage_space, pF);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", &count);
     LoadNMaterials(pStorage_space, pF, count);
 }
@@ -810,9 +840,9 @@ void LoadSomeModels(tBrender_storage* pStorage_space, FILE* pF) {
     char* str;
     br_model* temp_array[2000];
     LOG_TRACE("(%p, %p)", pStorage_space, pF);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", &count);
     LoadNModels(pStorage_space, pF, count);
 }
@@ -828,9 +858,9 @@ void LoadSomeTrackModels(tBrender_storage* pStorage_space, FILE* pF) {
     char* str;
     br_model* temp_array[2000];
     LOG_TRACE("(%p, %p)", pStorage_space, pF);
-    char *saveptr;
+
     GetALineAndDontArgue(pF, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%d", &count);
     LoadNTrackModels(pStorage_space, pF, count);
 }
@@ -1050,7 +1080,20 @@ br_uint_32 AddProximities(br_actor* pActor, br_material* pMat, tFunkotronic_spec
 void Adjust2FloatsForExceptions(float* pVictim1, float* pVictim2, br_pixelmap* pCulprit) {
     tException_list e;
     LOG_TRACE("(%p, %p, %p)", pVictim1, pVictim2, pCulprit);
-    NOT_IMPLEMENTED();
+
+    if (pCulprit && pCulprit->identifier != NULL) {
+        e = FindExceptionInList(pCulprit->identifier, gExceptions);
+        if (e) {
+            if ((e->flags & ExceptionFlag_Double) != 0) {
+                *pVictim1 = *pVictim1 * 2.0f;
+                *pVictim2 = *pVictim2 * 2.0f;
+            }
+            if ((e->flags & ExceptionFlag_Quadruple) != 0) {
+                *pVictim1 = *pVictim1 * 4.0f;
+                *pVictim2 = *pVictim2 * 4.0f;
+            }
+        }
+    }
 }
 
 // IDA: void __usercall AddFunkotronics(FILE *pF@<EAX>, int pOwner@<EDX>, int pRef_offset@<EBX>)
@@ -1076,7 +1119,7 @@ void AddFunkotronics(FILE* pF, int pOwner, int pRef_offset) {
     int d_0;
     int d_1;
     LOG_TRACE("(%p, %d, %d)", pF, pOwner, pRef_offset);
-        char *saveptr;
+
     first_time = 1;
     while (!feof(pF)) {
         PossibleService();
@@ -1095,7 +1138,7 @@ void AddFunkotronics(FILE* pF, int pOwner, int pRef_offset) {
 
         the_funk = AddNewFunkotronic();
         the_funk->owner = pOwner;
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         the_funk->material = BrMaterialFind(str);
         if (the_funk->material == NULL) {
             FatalError(kFatalError_FindMaterialUsedByFunkotronicFile_S, str);
@@ -1204,6 +1247,10 @@ void AddFunkotronics(FILE* pF, int pOwner, int pRef_offset) {
                 the_funk->matrix_mod_data.roll_info.x_period = speed1 == 0.0f ? 0.0f : 1000.0f / speed1;
                 the_funk->matrix_mod_data.roll_info.y_period = speed2 == 0.0f ? 0.0f : 1000.0f / speed2;
             }
+#ifdef DETHRACE_3DFX_PATCH
+            Adjust2FloatsForExceptions(&the_funk->matrix_mod_data.roll_info.x_period, &the_funk->matrix_mod_data.roll_info.y_period, the_funk->material->colour_map);
+
+#endif
             break;
         default:
             break;
@@ -1267,11 +1314,18 @@ void AddFunkotronics(FILE* pF, int pOwner, int pRef_offset) {
                         193);
                 }
                 the_pixelmap = DRPixelmapAllocate(
+#ifdef DETHRACE_3DFX_PATCH
+                    BR_PMT_INDEX_8,
+#else
                     gScreen->type,
+#endif
                     the_funk->texture_animation_data.flic_info.flic_descriptor.width,
                     the_funk->texture_animation_data.flic_info.flic_descriptor.height,
                     the_pixels,
                     0);
+#ifdef DETHRACE_3DFX_PATCH
+                the_pixelmap = PurifiedPixelmap(the_pixelmap);
+#endif
                 AssertFlicPixelmap(&the_funk->texture_animation_data.flic_info.flic_descriptor, the_pixelmap);
                 the_funk->material->colour_map = the_pixelmap;
                 BrMaterialUpdate(the_funk->material, BR_MATU_ALL);
@@ -1386,7 +1440,7 @@ void AddGroovidelics(FILE* pF, int pOwner, br_actor* pParent_actor, int pRef_off
     int d_1;
     int d_2;
     LOG_TRACE("(%p, %d, %p, %d, %d)", pF, pOwner, pParent_actor, pRef_offset, pAllowed_to_be_absent);
-    char *saveptr;
+
     first_time = 1;
 
     while (!feof(pF)) {
@@ -1403,7 +1457,7 @@ void AddGroovidelics(FILE* pF, int pOwner, br_actor* pParent_actor, int pRef_off
             GetALineAndDontArgue(pF, s);
         }
         first_time = 0;
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         the_groove = AddNewGroovidelic();
         the_groove->owner = pOwner;
         the_groove->actor = DRActorFindRecurse(pParent_actor, str);
@@ -1826,7 +1880,15 @@ void SaveAdditionalStuff(void) {
 // IDA: br_uint_32 __cdecl ProcessMaterials(br_actor *pActor, tPMFM2CB pCallback)
 br_uint_32 ProcessMaterials(br_actor* pActor, tPMFM2CB pCallback) {
     LOG_TRACE("(%p, %d)", pActor, pCallback);
-    NOT_IMPLEMENTED();
+
+    if (pActor->material) {
+        pCallback(pActor->material);
+    }
+    if (pActor->type == BR_ACTOR_MODEL && pActor->model != NULL) {
+        ProcessModelFaceMaterials2(pActor->model, pCallback);
+    }
+
+    return BrActorEnum(pActor, (br_actor_enum_cbfn*)ProcessMaterials, pCallback);
 }
 
 // IDA: br_uint_32 __cdecl ProcessFaceMaterials2(br_actor *pActor, tPMFM2CB pCallback)
@@ -2340,7 +2402,9 @@ void ParseSpecialVolume(FILE* pF, tSpecial_volume* pSpec, char* pScreen_name_str
 // IDA: void __usercall AddExceptionToList(tException_list *pDst@<EAX>, tException_list pNew@<EDX>)
 void AddExceptionToList(tException_list* pDst, tException_list pNew) {
     LOG_TRACE("(%p, %d)", pDst, pNew);
-    NOT_IMPLEMENTED();
+
+    pNew->next = *pDst;
+    *pDst = pNew;
 }
 
 // IDA: void __usercall LoadExceptionsFile(char *pName@<EAX>)
@@ -2352,14 +2416,66 @@ void LoadExceptionsFile(char* pName) {
     tException_list e;
     char delimiters[4];
     LOG_TRACE("(\"%s\")", pName);
-    NOT_IMPLEMENTED();
+
+    strcpy(delimiters, "\t ,");
+    f = DRfopen(pName, "rt");
+    if (f) {
+        GetALineAndDontArgue(f, line);
+        tok = strtok(line, delimiters);
+        if (DRStricmp(tok, "VERSION")) {
+            FatalError(120, pName, "VERSION");
+        }
+        tok = strtok(NULL, delimiters);
+        if (sscanf(tok, "%d", &file_version) == 0 || file_version != 1) {
+            FatalError(121, tok, pName);
+        }
+
+        while (1) {
+            GetALineAndDontArgue(f, line);
+            tok = strtok(line, delimiters);
+            if (DRStricmp(tok, "end") == 0) {
+                break;
+            }
+            e = BrMemAllocate(sizeof(tException_list), kMem_misc);
+            e->name = BrMemAllocate(strlen(tok) + 1, kMem_misc_string);
+            strcpy(e->name, tok);
+            e->flags = 0;
+            while (1) {
+                tok = strtok(NULL, delimiters);
+                if (tok == NULL /*|| (IsTable[(unsigned __int8)(*v11 + 1)] & 0xE0) == 0*/) {
+                    break;
+                }
+                if (DRStricmp(tok, "mipmap") == 0) {
+                    e->flags |= ExceptionFlag_Mipmap;
+                } else if (DRStricmp(tok, "nobilinear") == 0) {
+                    e->flags |= ExceptionFlag_NoBilinear;
+                } else if (DRStricmp(tok, "double") == 0) {
+                    e->flags |= ExceptionFlag_Double;
+                } else if (DRStricmp(tok, "quadruple") == 0) {
+                    e->flags |= ExceptionFlag_Quadruple;
+                } else {
+                    FatalError(123, tok, pName);
+                }
+            }
+            AddExceptionToList(&gExceptions, e);
+        }
+        fclose(f);
+    }
 }
 
 // IDA: void __usercall LoadExceptionsFileForTrack(char *pTrack_file_name@<EAX>)
 void LoadExceptionsFileForTrack(char* pTrack_file_name) {
     tPath_name exceptions_file_name;
     LOG_TRACE("(\"%s\")", pTrack_file_name);
-    NOT_IMPLEMENTED();
+
+    sprintf(
+        exceptions_file_name,
+        "%s%s%s%s",
+        pTrack_file_name,
+        gDir_separator,
+        gExceptions_general_file,
+        gExceptions_file_suffix);
+    LoadExceptionsFile(exceptions_file_name);
 }
 
 // IDA: void __cdecl FreeExceptions()
@@ -2367,7 +2483,17 @@ void FreeExceptions(void) {
     tException_list list;
     tException_list next;
     LOG_TRACE("()");
-    NOT_IMPLEMENTED();
+
+    list = gExceptions;
+    if (list) {
+        do {
+            next = list->next;
+            BrMemFree(list->name);
+            BrMemFree(list);
+            list = next;
+        } while (next);
+    }
+    gExceptions = NULL;
 }
 
 // IDA: void __usercall LoadTrack(char *pFile_name@<EAX>, tTrack_spec *pTrack_spec@<EDX>, tRace_info *pRace_info@<EBX>)
@@ -2414,35 +2540,38 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
     br_pixelmap* sky;
     br_material* material;
     LOG_TRACE("(\"%s\", %p, %p)", pFile_name, pTrack_spec, pRace_info);
-    char *saveptr;
+
     killed_sky = 0;
     PathCat(the_path, gApplication_path, "RACES");
     PathCat(the_path, the_path, pFile_name);
+#ifdef DETHRACE_3DFX_PATCH
+    LoadExceptionsFileForTrack(the_path);
+#endif
     f = DRfopen(the_path, "rt");
     if (f == NULL) {
         FatalError(kFatalError_OpenRacesFile);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     if (strcmp(str, "VERSION") == 0) {
-        str = strtok_r(0, "\t ,/", &saveptr);
+        str = strtok(NULL, "\t ,/");
         sscanf(str, "%d", &gRace_file_version);
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
     } else {
         gRace_file_version = 0;
     }
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_position.v[0] = temp_float;
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(0, "\t ,/");
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_position.v[1] = temp_float;
-    str = strtok_r(0, "\t ,/", &saveptr);
+    str = strtok(0, "\t ,/");
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_position.v[2] = temp_float;
     PossibleService();
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok(s, "\t ,/");
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_yaw = temp_float;
     GetThreeInts(f, pRace_info->initial_timer, &pRace_info->initial_timer[1], &pRace_info->initial_timer[2]);
@@ -2524,15 +2653,20 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
         LoadSomeMaterials(&gTrack_storage_space, f);
         SkipNLines(f);
     }
-    for (i = 0; gTrack_storage_space.materials_count > i; ++i) {
-        PossibleService();
-        if (gTrack_storage_space.materials[i]->flags & (BR_MATF_LIGHT | BR_MATF_PRELIT | BR_MATF_SMOOTH)) {
-            gTrack_storage_space.materials[i]->flags &= ~(BR_MATF_LIGHT | BR_MATF_PRELIT | BR_MATF_SMOOTH);
-            if (gTrack_storage_space.materials[i]->flags & BR_MATF_TWO_SIDED) {
-                gTrack_storage_space.materials[i]->user = DOUBLESIDED_USER_FLAG;
-                gTrack_storage_space.materials[i]->flags &= ~BR_MATF_TWO_SIDED;
+#ifdef DETHRACE_3DFX_PATCH
+    if (!gShade_tables_do_not_work)
+#endif
+    {
+        for (i = 0; i < gTrack_storage_space.materials_count; i++) {
+            PossibleService();
+            if (gTrack_storage_space.materials[i]->flags & (BR_MATF_LIGHT | BR_MATF_PRELIT | BR_MATF_SMOOTH)) {
+                gTrack_storage_space.materials[i]->flags &= ~(BR_MATF_LIGHT | BR_MATF_PRELIT | BR_MATF_SMOOTH);
+                if (gTrack_storage_space.materials[i]->flags & BR_MATF_TWO_SIDED) {
+                    gTrack_storage_space.materials[i]->user = DOUBLESIDED_USER_FLAG;
+                    gTrack_storage_space.materials[i]->flags &= ~BR_MATF_TWO_SIDED;
+                }
+                BrMaterialUpdate(gTrack_storage_space.materials[i], BR_MATU_RENDERING);
             }
-            BrMaterialUpdate(gTrack_storage_space.materials[i], BR_MATU_RENDERING);
         }
     }
     if (gRace_file_version <= 5) {
@@ -2548,18 +2682,18 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
     PrintMemoryDump(0, "JUST LOADED IN TEXTURES/MATS/MODELS FOR TRACK");
     if (gRace_file_version <= 5) {
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         PathCat(the_path, gApplication_path, "ACTORS");
         PathCat(the_path, the_path, str);
     } else if (gAusterity_mode) {
         GetALineAndDontArgue(f, s);
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         PathCat(the_path, gApplication_path, "ACTORS");
         PathCat(the_path, the_path, str);
     } else {
         GetALineAndDontArgue(f, s);
-        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok(s, "\t ,/");
         PathCat(the_path, gApplication_path, "ACTORS");
         PathCat(the_path, the_path, str);
         GetALineAndDontArgue(f, s);
@@ -2600,15 +2734,15 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
     }
     BrActorAdd(gUniverse_actor, pTrack_spec->the_actor);
     GetALineAndDontArgue(f, s);
-    str = strtok_r(s, "\t ,/", &saveptr);
-    str = strtok_r(str, ".", &saveptr);
+    str = strtok(s, "\t ,/");
+    str = strtok(str, ".");
     strcat(str, ".DAT");
     PathCat(gAdditional_model_path, gApplication_path, "MODELS");
     PathCat(gAdditional_model_path, gAdditional_model_path, str);
     gNumber_of_additional_models = 0;
     PossibleService();
-    str = strtok_r(s, "\t ,/", &saveptr);
-    str = strtok_r(str, ".", &saveptr);
+    str = strtok(s, "\t ,/");
+    str = strtok(str, ".");
     strcat(str, ".ACT");
     PathCat(gAdditional_actor_path, gApplication_path, "ACTORS");
     PathCat(gAdditional_actor_path, gAdditional_actor_path, str);
@@ -2698,11 +2832,11 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
             } else {
                 TELL_ME_IF_WE_PASS_THIS_WAY();
                 spec->no_mat = 0;
-                str = strtok_r(s, "\t ,/", &saveptr);
+                str = strtok(s, "\t ,/");
                 sscanf(str, "%f", &spec->bounds.min.v[0]);
-                str = strtok_r(0, "\t ,/", &saveptr);
+                str = strtok(0, "\t ,/");
                 sscanf(str, "%f", &spec->bounds.min.v[1]);
-                str = strtok_r(0, "\t ,/", &saveptr);
+                str = strtok(0, "\t ,/");
                 sscanf(str, "%f", &spec->bounds.min.v[2]);
                 GetThreeScalars(f, &spec->bounds.max.v[0], &spec->bounds.max.v[1], &spec->bounds.max.v[2]);
                 BrMatrix34Identity(&spec->mat);
@@ -2798,7 +2932,8 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
         pRace_info->material_modifiers[i].sparkiness = GetAScalar(f);
         pRace_info->material_modifiers[i].smoke_type = GetAnInt(f);
         GetAString(f, s);
-        str = strtok_r(s, ".", &saveptr);
+        str = strtok(s, ".");
+
         if (!strcmp(s, "none") || !strcmp(s, "NONE") || !strcmp(s, "0") || !strcmp(s, "1")) {
             pRace_info->material_modifiers[i].skid_mark_material = NULL;
         } else {
@@ -2809,6 +2944,13 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
             strcat(str, ".MAT");
             material = LoadSingleMaterial(&gTrack_storage_space, str);
             pRace_info->material_modifiers[i].skid_mark_material = material;
+#ifdef DETHRACE_3DFX_PATCH
+            if (material != NULL) {
+                GlorifyMaterial(&material, 1);
+                BrMaterialUpdate(material, BR_MATU_ALL);
+            }
+#endif
+
 #if defined(DETHRACE_FIX_BUGS)
             skid_mark_cnt++;
 #endif
@@ -2904,6 +3046,9 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
         FatalError(kFatalError_FileCorrupt_S, pFile_name);
     }
     fclose(f);
+#ifdef DETHRACE_3DFX_PATCH
+    FreeExceptions();
+#endif
 }
 
 // IDA: br_uint_32 __cdecl RemoveBounds(br_actor *pActor, void *pArg)
@@ -2921,7 +3066,7 @@ br_uintptr_t RemoveBounds(br_actor* pActor, void* pArg) {
 void RemoveBoundsStructures(br_actor* pActor) {
     LOG_TRACE("(%p)", pActor);
 
-    DRActorEnumRecurse(pActor, (br_actor_enum_cbfn*)RemoveBounds, NULL);
+    DRActorEnumRecurse(pActor, RemoveBounds, NULL);
 }
 
 // IDA: void __usercall FreeTrack(tTrack_spec *pTrack_spec@<EAX>)
@@ -2999,46 +3144,46 @@ br_scalar NormaliseDegreeAngle(br_scalar pAngle) {
 
 #define SAW(T, PERIOD) (fmodf((T), (PERIOD)) / (PERIOD))
 
-#define MOVE_FUNK_PARAMETER(DEST, MODE, PERIOD, AMPLITUDE, FLASH_VALUE)                   \
-    do {                                                                                  \
-        switch (MODE) {                                                                   \
-        case eMove_continuous:                                                            \
-            if ((PERIOD) == 0.f) {                                                        \
-                DEST = 0.f;                                                               \
-            } else {                                                                      \
-                DEST = (AMPLITUDE)*SAW(f_the_time, (PERIOD));                             \
-            }                                                                             \
-            break;                                                                        \
-        case eMove_controlled:                                                            \
-            DEST = (PERIOD) * (AMPLITUDE);                                                \
-            break;                                                                        \
-        case eMove_absolute:                                                              \
-            DEST = (PERIOD);                                                              \
-            break;                                                                        \
-        case eMove_linear:                                                                \
-            if ((PERIOD) == 0.f) {                                                        \
-                DEST = 0.f;                                                               \
-            } else {                                                                      \
-                DEST = (AMPLITUDE)*MapSawToTriangle(SAW(f_the_time, (PERIOD)));           \
-            }                                                                             \
-            break;                                                                        \
-        case eMove_flash:                                                                 \
-            if (2 * fmodf(f_the_time, (PERIOD)) > (PERIOD)) {                             \
-                DEST = (FLASH_VALUE);                                                     \
-            } else {                                                                      \
-                DEST = -(FLASH_VALUE);                                                    \
-            }                                                                             \
-            break;                                                                        \
-        case eMove_harmonic:                                                              \
-            if ((PERIOD) == 0.f) {                                                        \
-                DEST = 0.f;                                                               \
-            } else {                                                                      \
-                DEST = (AMPLITUDE)*BR_SIN(BR_ANGLE_DEG(SAW(f_the_time, (PERIOD)) * 360)); \
-            }                                                                             \
-            break;                                                                        \
-        default:                                                                          \
-            TELL_ME_IF_WE_PASS_THIS_WAY();                                                \
-        }                                                                                 \
+#define MOVE_FUNK_PARAMETER(DEST, MODE, PERIOD, AMPLITUDE, FLASH_VALUE)                     \
+    do {                                                                                    \
+        switch (MODE) {                                                                     \
+        case eMove_continuous:                                                              \
+            if ((PERIOD) == 0.f) {                                                          \
+                DEST = 0.f;                                                                 \
+            } else {                                                                        \
+                DEST = (AMPLITUDE) * SAW(f_the_time, (PERIOD));                             \
+            }                                                                               \
+            break;                                                                          \
+        case eMove_controlled:                                                              \
+            DEST = (PERIOD) * (AMPLITUDE);                                                  \
+            break;                                                                          \
+        case eMove_absolute:                                                                \
+            DEST = (PERIOD);                                                                \
+            break;                                                                          \
+        case eMove_linear:                                                                  \
+            if ((PERIOD) == 0.f) {                                                          \
+                DEST = 0.f;                                                                 \
+            } else {                                                                        \
+                DEST = (AMPLITUDE) * MapSawToTriangle(SAW(f_the_time, (PERIOD)));           \
+            }                                                                               \
+            break;                                                                          \
+        case eMove_flash:                                                                   \
+            if (2 * fmodf(f_the_time, (PERIOD)) > (PERIOD)) {                               \
+                DEST = (FLASH_VALUE);                                                       \
+            } else {                                                                        \
+                DEST = -(FLASH_VALUE);                                                      \
+            }                                                                               \
+            break;                                                                          \
+        case eMove_harmonic:                                                                \
+            if ((PERIOD) == 0.f) {                                                          \
+                DEST = 0.f;                                                                 \
+            } else {                                                                        \
+                DEST = (AMPLITUDE) * BR_SIN(BR_ANGLE_DEG(SAW(f_the_time, (PERIOD)) * 360)); \
+            }                                                                               \
+            break;                                                                          \
+        default:                                                                            \
+            TELL_ME_IF_WE_PASS_THIS_WAY();                                                  \
+        }                                                                                   \
     } while (0)
 
 // IDA: void __cdecl FunkThoseTronics()
@@ -3628,7 +3773,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.spin_info.period != 0.0) {
-                    pos = sinf(
+                    pos = sin(
                               BrAngleToRadian(
                                   BrDegreeToAngle(
                                       fmod(pTime, pGroove->object_data.spin_info.period) / pGroove->object_data.spin_info.period * 360.0)))
@@ -3658,7 +3803,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.spin_info.period != 0.0) {
-                    pos = sinf(
+                    pos = sin(
                               BrAngleToRadian(
                                   BrDegreeToAngle(
                                       fmod(pTime, pGroove->object_data.spin_info.period) / pGroove->object_data.spin_info.period * 360.0)))
@@ -3688,7 +3833,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.spin_info.period != 0.0) {
-                    pos = sinf(
+                    pos = sin(
                               BrAngleToRadian(
                                   BrDegreeToAngle(
                                       fmod(pTime, pGroove->object_data.spin_info.period) / pGroove->object_data.spin_info.period * 360.0)))
@@ -3721,7 +3866,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
             }
         } else if (pGroove->object_mode == eMove_harmonic) {
             if (pGroove->object_data.rock_info.period != 0.0) {
-                pos = sinf(
+                pos = sin(
                           BrAngleToRadian(
                               BrDegreeToAngle(
                                   fmod(pTime, pGroove->object_data.rock_info.period) / pGroove->object_data.rock_info.period * 360.0)))
@@ -3783,7 +3928,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
             }
         } else if (pGroove->object_mode == eMove_harmonic) {
             if (pGroove->object_data.throb_info.z_period != 0.0) {
-                z_size = sinf(
+                z_size = sin(
                              BrAngleToRadian(
                                  BrDegreeToAngle(
                                      fmod(pTime, pGroove->object_data.throb_info.z_period) / pGroove->object_data.throb_info.z_period * 360.0)))
@@ -3812,7 +3957,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
             }
         } else if (pGroove->object_mode == eMove_harmonic) {
             if (pGroove->object_data.throb_info.x_period != 0.0) {
-                x_size = sinf(
+                x_size = sin(
                              BrAngleToRadian(
                                  BrDegreeToAngle(
                                      fmod(pTime, pGroove->object_data.throb_info.x_period) / pGroove->object_data.throb_info.x_period * 360.0)))
@@ -3841,7 +3986,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
             }
         } else if (pGroove->object_mode == eMove_harmonic) {
             if (pGroove->object_data.throb_info.y_period != 0.0) {
-                y_size = sinf(
+                y_size = sin(
                              BrAngleToRadian(
                                  BrDegreeToAngle(
                                      fmod(pTime, pGroove->object_data.throb_info.y_period) / pGroove->object_data.throb_info.y_period * 360.0)))
@@ -3875,7 +4020,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.z_period != 0.0) {
-                    z_size = sinf(
+                    z_size = sin(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.z_period) / pGroove->object_data.shear_info.z_period * 360.0)))
@@ -3904,7 +4049,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.y_period != 0.0) {
-                    y_size = sinf(
+                    y_size = sin(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.y_period) / pGroove->object_data.shear_info.y_period * 360.0)))
@@ -3935,7 +4080,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.z_period != 0.0) {
-                    z_size = sinf(
+                    z_size = sin(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.z_period) / pGroove->object_data.shear_info.z_period * 360.0)))
@@ -3964,7 +4109,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.x_period != 0.0) {
-                    x_size = sinf(
+                    x_size = sin(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.x_period) / pGroove->object_data.shear_info.x_period * 360.0)))
@@ -3995,7 +4140,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.y_period != 0.0) {
-                    y_size = sinf(
+                    y_size = sin(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.y_period) / pGroove->object_data.shear_info.y_period * 360.0)))
@@ -4024,7 +4169,7 @@ void ObjectGrooveBastard(tGroovidelic_spec* pGroove, tU32 pTime, br_matrix34* pM
                 }
             } else if (pGroove->object_mode == eMove_harmonic) {
                 if (pGroove->object_data.shear_info.x_period != 0.0) {
-                    x_size = sinf(
+                    x_size = sin(
                                  BrAngleToRadian(
                                      BrDegreeToAngle(
                                          fmod(pTime, pGroove->object_data.shear_info.x_period) / pGroove->object_data.shear_info.x_period * 360.0)))
@@ -4113,7 +4258,7 @@ void GrooveThoseDelics(void) {
     LOG_TRACE("()");
 
     if (gGroovidelics_array != NULL) {
-        f_the_time = (float)GetTotalTime();
+        f_the_time = (double)GetTotalTime();
         gPrevious_groove_times[1] = gPrevious_groove_times[0];
         gPrevious_groove_times[0] = f_the_time;
 
@@ -4233,12 +4378,12 @@ br_uint_32 CalcHighestID(br_actor* pActor, int* pHighest) {
 br_uint_32 SetID(br_actor* pActor, void* pArg) {
     char s[256];
     LOG_TRACE("(%p, %p)", pActor, pArg);
-    char *saveptr;
+
     if (pActor->identifier == NULL) {
         return 0;
     }
     strcpy(s, pActor->identifier);
-    strtok_r(s, ".", &saveptr);
+    strtok(s, ".");
     strcat(s, "0000");
     sprintf(&s[4], "%04d", (int)(intptr_t)pArg);
     strcat(s, ".ACT");
@@ -4279,13 +4424,13 @@ br_uint_32 CalcHighestNonAmID(br_actor* pActor, int* pHighest) {
     char s[256];
     int number;
     LOG_TRACE("(%p, %p)", pActor, pHighest);
-    char *saveptr;
+
     if (pActor->identifier == NULL || pActor->identifier[0] == '&') {
         return 0;
     }
     if (strlen(pActor->identifier) == 12) {
         strcpy(s, &pActor->identifier[4]);
-        strtok_r(s, ".", &saveptr);
+        strtok(s, ".");
         sscanf(s, "%d", &number);
     } else {
         number = 0;
@@ -4302,14 +4447,14 @@ br_uint_32 SetIDAndDupModel(br_actor* pActor, void* pArg) {
     char s2[256];
     br_model* new_model;
     LOG_TRACE("(%p, %p)", pActor, pArg);
-    char *saveptr;
+
     if (pActor->identifier == NULL || pActor->identifier[0] == '@') {
         return 0;
     }
     *(int*)(uintptr_t)pArg = *(int*)(uintptr_t)pArg + 1;
     strcpy(s, pActor->identifier);
     s[0] = '@';
-    strtok_r(s, ".", &saveptr);
+    strtok(s, ".");
     strcat(s, "0000");
     sprintf(&s[4], "%04d", *(int*)(uintptr_t)pArg);
     strcpy(s2, s);

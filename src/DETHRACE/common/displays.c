@@ -3,8 +3,10 @@
 #include "constants.h"
 #include "controls.h"
 #include "depth.h"
+#include "errors.h"
 #include "flicplay.h"
 #include "globvars.h"
+#include "globvrbm.h"
 #include "globvrkm.h"
 #include "globvrpb.h"
 #include "grafdata.h"
@@ -230,7 +232,25 @@ void DRPixelmapCleverText2(br_pixelmap* pPixelmap, int pX, int pY, tDR_font* pFo
 // IDA: void __usercall DeviouslyDimRectangle(br_pixelmap *pPixelmap@<EAX>, int pLeft@<EDX>, int pTop@<EBX>, int pRight@<ECX>, int pBottom, int pKnock_out_corners)
 void DeviouslyDimRectangle(br_pixelmap* pPixelmap, int pLeft, int pTop, int pRight, int pBottom, int pKnock_out_corners) {
     LOG_TRACE("(%p, %d, %d, %d, %d, %d)", pPixelmap, pLeft, pTop, pRight, pBottom, pKnock_out_corners);
-    NOT_IMPLEMENTED();
+
+    if (pPixelmap != gBack_screen) {
+        FatalError(124);
+    }
+
+    gDim_model->vertices[1].p.v[0] = pLeft;
+    gDim_model->vertices[0].p.v[0] = pLeft;
+    gDim_model->vertices[3].p.v[0] = pRight;
+    gDim_model->vertices[2].p.v[0] = pRight;
+    gDim_model->vertices[3].p.v[1] = -pTop;
+    gDim_model->vertices[0].p.v[1] = -pTop;
+    gDim_model->vertices[2].p.v[1] = -pBottom;
+    gDim_model->vertices[1].p.v[1] = -pBottom;
+    BrModelUpdate(gDim_model, BR_MODU_VERTEX_POSITIONS);
+    gDim_actor->render_style = BR_RSTYLE_FACES;
+    PDUnlockRealBackScreen(1);
+    BrZbSceneRender(g2d_camera, g2d_camera, gBack_screen, gDepth_buffer);
+    PDLockRealBackScreen(1);
+    gDim_actor->render_style = BR_RSTYLE_NONE;
 }
 
 // IDA: void __cdecl DimRectangle(br_pixelmap *pPixelmap, int pLeft, int pTop, int pRight, int pBottom, int pKnock_out_corners)
@@ -243,6 +263,11 @@ void DimRectangle(br_pixelmap* pPixelmap, int pLeft, int pTop, int pRight, int p
     int line_skip;
     int width;
     LOG_TRACE9("(%p, %d, %d, %d, %d, %d)", pPixelmap, pLeft, pTop, pRight, pBottom, pKnock_out_corners);
+
+    if (gDevious_2d) {
+        DeviouslyDimRectangle(pPixelmap, pLeft, pTop, pRight, pBottom, pKnock_out_corners);
+        return;
+    }
 
     ptr = (tU8*)pPixelmap->pixels + pLeft + pPixelmap->row_bytes * pTop;
     line_skip = pPixelmap->row_bytes - pRight + pLeft;
@@ -315,6 +340,12 @@ void DoPSPowerHeadup(int pY, int pLevel, char* pName, int pBar_colour) {
     char s[16];
     int i;
     LOG_TRACE("(%d, %d, \"%s\", %d)", pY, pLevel, pName, pBar_colour);
+
+#ifdef DETHRACE_3DFX_PATCH
+    if (gBack_screen->type == BR_PMT_RGB_565) {
+        pBar_colour = PaletteEntry16Bit(gRender_palette, pBar_colour);
+    }
+#endif
 
     DimRectangle(gBack_screen, gCurrent_graf_data->ps_dim_left, pY, gCurrent_graf_data->ps_dim_right, gCurrent_graf_data->ps_dim_height + pY, 1);
     TransDRPixelmapText(gBack_screen, gCurrent_graf_data->ps_name_left, gCurrent_graf_data->ps_name_top_border + pY, gFonts + 6, pName, gBack_screen->width);
@@ -1063,11 +1094,11 @@ void DoInstruments(tU32 pThe_time) {
     int the_wobble_y;
     int gear;
     int gear_height; /* Added by dethrace. */
-    float the_angle;
-    float the_angle2;
-    float sin_angle;
-    float cos_angle;
-    float speed_mph;
+    double the_angle;
+    double the_angle2;
+    double sin_angle;
+    double cos_angle;
+    double speed_mph;
     LOG_TRACE("(%d)", pThe_time);
 
     if (gProgram_state.current_car_index == gProgram_state.current_car.index) {
@@ -1088,9 +1119,9 @@ void DoInstruments(tU32 pThe_time) {
         tacho_image = gProgram_state.current_car.tacho_image[gProgram_state.cockpit_on];
         if (gProgram_state.current_car.tacho_radius_2[gProgram_state.cockpit_on] >= 0) {
             if (gCar_to_view->red_line >= gCar_to_view->revs) {
-                the_angle = DEG_TO_RAD((float)(gProgram_state.current_car.tacho_end_angle[gProgram_state.cockpit_on] - gProgram_state.current_car.tacho_start_angle[gProgram_state.cockpit_on]) * gCar_to_view->revs / (float)gCar_to_view->red_line + (float)gProgram_state.current_car.tacho_start_angle[gProgram_state.cockpit_on]);
+                the_angle = DEG_TO_RAD((double)(gProgram_state.current_car.tacho_end_angle[gProgram_state.cockpit_on] - gProgram_state.current_car.tacho_start_angle[gProgram_state.cockpit_on]) * gCar_to_view->revs / (double)gCar_to_view->red_line + (double)gProgram_state.current_car.tacho_start_angle[gProgram_state.cockpit_on]);
             } else {
-                the_angle = DEG_TO_RAD((float)gProgram_state.current_car.tacho_end_angle[gProgram_state.cockpit_on]);
+                the_angle = DEG_TO_RAD((double)gProgram_state.current_car.tacho_end_angle[gProgram_state.cockpit_on]);
             }
             if (the_angle >= 0.0) {
                 if (the_angle >= TAU) {
@@ -1140,67 +1171,36 @@ void DoInstruments(tU32 pThe_time) {
                     tacho_image->width,
                     tacho_image->height);
             }
-/*
-printf("PoshDrawLine Debug: \n"
-       "  Angle: %f\n"
-       "  Screen: %p\n"
-       "  Start X: %f, Start Y: %f\n"
-       "  End X: %f, End Y: %f\n"
-       "  Needle Color: %d\n",
-       the_angle, 
-       gBack_screen,
-       gProgram_state.current_car.tacho_radius_1[gProgram_state.cockpit_on] * sin_angle
-         + gProgram_state.current_car.tacho_centre_x[gProgram_state.cockpit_on]
-         + the_wobble_x,
-       gProgram_state.current_car.tacho_centre_y[gProgram_state.cockpit_on]
-         - gProgram_state.current_car.tacho_radius_1[gProgram_state.cockpit_on] * cos_angle
-         + the_wobble_y,
-       gProgram_state.current_car.tacho_radius_2[gProgram_state.cockpit_on] * sin_angle
-         + gProgram_state.current_car.tacho_centre_x[gProgram_state.cockpit_on]
-         + the_wobble_x,
-       gProgram_state.current_car.tacho_centre_y[gProgram_state.cockpit_on]
-         - gProgram_state.current_car.tacho_radius_2[gProgram_state.cockpit_on] * cos_angle
-         + the_wobble_y,
-       gProgram_state.current_car.tacho_needle_colour[gProgram_state.cockpit_on]);
 
-// Now add individual prints for index [0]
-printf("Single debug prints:\n");
-printf("  tacho_radius_1[0] = %d\n", 
-       gProgram_state.current_car.tacho_radius_1[0]);
-printf("  tacho_radius_2[0] = %d\n", 
-       gProgram_state.current_car.tacho_radius_2[0]);
-printf("  tacho_centre_x[0] = %d\n", 
-       gProgram_state.current_car.tacho_centre_x[0]);
-printf("  tacho_centre_y[0] = %d\n", 
-       gProgram_state.current_car.tacho_centre_y[0]);
-printf("  tacho_needle_colour[0] = %d\n", 
-       gProgram_state.current_car.tacho_needle_colour[0]);
-*/
             PoshDrawLine(
                 the_angle,
                 gBack_screen,
-                ((float)gProgram_state.current_car.tacho_radius_1[gProgram_state.cockpit_on] * sin_angle
-                    + (float)gProgram_state.current_car.tacho_centre_x[gProgram_state.cockpit_on]
-                    + (float)the_wobble_x),
-                ((float)gProgram_state.current_car.tacho_centre_y[gProgram_state.cockpit_on]
-                    - (float)gProgram_state.current_car.tacho_radius_1[gProgram_state.cockpit_on] * cos_angle
-                    + (float)the_wobble_y),
-                ((float)gProgram_state.current_car.tacho_radius_2[gProgram_state.cockpit_on] * sin_angle
-                    + (float)gProgram_state.current_car.tacho_centre_x[gProgram_state.cockpit_on]
-                    + (float)the_wobble_x),
-                ((float)gProgram_state.current_car.tacho_centre_y[gProgram_state.cockpit_on]
-                    - (float)gProgram_state.current_car.tacho_radius_2[gProgram_state.cockpit_on] * cos_angle
-                    + (float)the_wobble_y),
+                ((double)gProgram_state.current_car.tacho_radius_1[gProgram_state.cockpit_on] * sin_angle
+                    + (double)gProgram_state.current_car.tacho_centre_x[gProgram_state.cockpit_on]
+                    + (double)the_wobble_x),
+                ((double)gProgram_state.current_car.tacho_centre_y[gProgram_state.cockpit_on]
+                    - (double)gProgram_state.current_car.tacho_radius_1[gProgram_state.cockpit_on] * cos_angle
+                    + (double)the_wobble_y),
+                ((double)gProgram_state.current_car.tacho_radius_2[gProgram_state.cockpit_on] * sin_angle
+                    + (double)gProgram_state.current_car.tacho_centre_x[gProgram_state.cockpit_on]
+                    + (double)the_wobble_x),
+                ((double)gProgram_state.current_car.tacho_centre_y[gProgram_state.cockpit_on]
+                    - (double)gProgram_state.current_car.tacho_radius_2[gProgram_state.cockpit_on] * cos_angle
+                    + (double)the_wobble_y),
                 gProgram_state.current_car.tacho_needle_colour[gProgram_state.cockpit_on]);
         } else if (tacho_image != NULL) {
+#ifdef DETHRACE_3DFX_PATCH
+            DRPixelmapRectangleCopy(
+#else
             BrPixelmapRectangleCopy(
+#endif
                 gBack_screen,
                 the_wobble_x + gProgram_state.current_car.tacho_x[gProgram_state.cockpit_on],
                 the_wobble_y + gProgram_state.current_car.tacho_y[gProgram_state.cockpit_on],
                 gProgram_state.current_car.tacho_image[gProgram_state.cockpit_on],
                 0,
                 0,
-                ((gCar_to_view->revs - 1.0) / (float)gCar_to_view->red_line * (float)gProgram_state.current_car.tacho_image[gProgram_state.cockpit_on]->width + 1.0),
+                ((gCar_to_view->revs - 1.0) / (double)gCar_to_view->red_line * (double)gProgram_state.current_car.tacho_image[gProgram_state.cockpit_on]->width + 1.0),
                 gProgram_state.current_car.tacho_image[gProgram_state.cockpit_on]->height);
         }
         if (!gProgram_state.cockpit_on || gProgram_state.cockpit_image_index < 0 || gProgram_state.which_view == eView_forward) {
@@ -1246,10 +1246,10 @@ printf("  tacho_needle_colour[0] = %d\n",
                     speedo_image->width,
                     speedo_image->height);
             }
-            if ((float)gProgram_state.current_car.max_speed >= speed_mph) {
-                the_angle = DEG_TO_RAD((float)(gProgram_state.current_car.speedo_end_angle[gProgram_state.cockpit_on] - gProgram_state.current_car.speedo_start_angle[gProgram_state.cockpit_on]) * speed_mph / (float)gProgram_state.current_car.max_speed + (float)gProgram_state.current_car.speedo_start_angle[gProgram_state.cockpit_on]);
+            if ((double)gProgram_state.current_car.max_speed >= speed_mph) {
+                the_angle = DEG_TO_RAD((double)(gProgram_state.current_car.speedo_end_angle[gProgram_state.cockpit_on] - gProgram_state.current_car.speedo_start_angle[gProgram_state.cockpit_on]) * speed_mph / (double)gProgram_state.current_car.max_speed + (double)gProgram_state.current_car.speedo_start_angle[gProgram_state.cockpit_on]);
             } else {
-                the_angle = DEG_TO_RAD((float)gProgram_state.current_car.speedo_end_angle[gProgram_state.cockpit_on]);
+                the_angle = DEG_TO_RAD((double)gProgram_state.current_car.speedo_end_angle[gProgram_state.cockpit_on]);
             }
 
             if (the_angle < 0.0) {
@@ -1284,18 +1284,18 @@ printf("  tacho_needle_colour[0] = %d\n",
             PoshDrawLine(
                 the_angle,
                 gBack_screen,
-                ((float)gProgram_state.current_car.speedo_radius_1[gProgram_state.cockpit_on] * sin_angle
-                    + (float)gProgram_state.current_car.speedo_centre_x[gProgram_state.cockpit_on]
-                    + (float)the_wobble_x),
-                ((float)gProgram_state.current_car.speedo_centre_y[gProgram_state.cockpit_on]
-                    - (float)gProgram_state.current_car.speedo_radius_1[gProgram_state.cockpit_on] * cos_angle
-                    + (float)the_wobble_y),
-                ((float)gProgram_state.current_car.speedo_radius_2[gProgram_state.cockpit_on] * sin_angle
-                    + (float)gProgram_state.current_car.speedo_centre_x[gProgram_state.cockpit_on]
-                    + (float)the_wobble_x),
-                ((float)gProgram_state.current_car.speedo_centre_y[gProgram_state.cockpit_on]
-                    - (float)gProgram_state.current_car.speedo_radius_2[gProgram_state.cockpit_on] * cos_angle
-                    + (float)the_wobble_y),
+                ((double)gProgram_state.current_car.speedo_radius_1[gProgram_state.cockpit_on] * sin_angle
+                    + (double)gProgram_state.current_car.speedo_centre_x[gProgram_state.cockpit_on]
+                    + (double)the_wobble_x),
+                ((double)gProgram_state.current_car.speedo_centre_y[gProgram_state.cockpit_on]
+                    - (double)gProgram_state.current_car.speedo_radius_1[gProgram_state.cockpit_on] * cos_angle
+                    + (double)the_wobble_y),
+                ((double)gProgram_state.current_car.speedo_radius_2[gProgram_state.cockpit_on] * sin_angle
+                    + (double)gProgram_state.current_car.speedo_centre_x[gProgram_state.cockpit_on]
+                    + (double)the_wobble_x),
+                ((double)gProgram_state.current_car.speedo_centre_y[gProgram_state.cockpit_on]
+                    - (double)gProgram_state.current_car.speedo_radius_2[gProgram_state.cockpit_on] * cos_angle
+                    + (double)the_wobble_y),
                 gProgram_state.current_car.speedo_needle_colour[gProgram_state.cockpit_on]);
             if (speedo_image != NULL && gProgram_state.cockpit_on && gProgram_state.cockpit_image_index >= 0) {
                 DRPixelmapRectangleMaskedCopy(
