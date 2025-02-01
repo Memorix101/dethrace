@@ -509,8 +509,11 @@ static void swap(br_pixelmap* back_buffer) {
 
 static void palette_changed(br_colour entries[256]) {
     for (int i = 0; i < 256; i++) {
-        //converted_palette[i] = (0xff << 24 | BR_RED(entries[i]) << 16 | BR_GRN(entries[i]) << 8 | BR_BLU(entries[i]));
-        converted_palette[i] = (0xff << 24 |  BR_BLU(entries[i]) << 16 | BR_GRN(entries[i]) << 8 | BR_RED(entries[i]));
+        #ifdef __DREAMCAST__
+            converted_palette[i] = (0xff << 24 |  BR_BLU(entries[i]) << 16 | BR_GRN(entries[i]) << 8 | BR_RED(entries[i]));
+        #else
+            converted_palette[i] = (0xff << 24 | BR_RED(entries[i]) << 16 | BR_GRN(entries[i]) << 8 | BR_BLU(entries[i]));
+        #endif
     }
     if (last_screen_src != NULL) {
         swap(last_screen_src);
