@@ -404,7 +404,7 @@ static void create_window(char* title, int width, int height, tHarness_window_ty
 
     if (window_type == eWindow_type_opengl) {
 
-        printf("Starting OpenGL renderer\n");
+        //printf("Starting OpenGL renderer\n");
 
         window = SDL_CreateWindow(title,
             SDL_WINDOWPOS_CENTERED,
@@ -435,7 +435,7 @@ static void create_window(char* title, int width, int height, tHarness_window_ty
 
     } else {
 
-        printf("Starting software renderer\n");
+        //printf("Starting software renderer\n");
 
         window = SDL_CreateWindow(title,
             SDL_WINDOWPOS_CENTERED,

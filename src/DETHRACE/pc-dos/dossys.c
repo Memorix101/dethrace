@@ -33,12 +33,22 @@
 int gDOSGfx_initialized;
 int gExtra_mem;
 int gReplay_override;
+
+#ifdef __DREAMCAST__
 tGraf_spec gGraf_specs[2] = {
     { 8, 1, 0, 320, 200, 0, 0, "32X20X8", "MCGA,W:320,H:200,B:8", 320, 320, 200, NULL },
     { 8, 1, 0, 320, 200, 0, 0, "32X20X8", "MCGA,W:320,H:200,B:8", 320, 320, 200, NULL }
     //{ 8, 1, 0, 640, 480, 0, 0, "64X48X8", "VESA,W:640,H:480,B:8", 640, 640, 480, NULL }
     // { 8, 1, 0, 1920, 1080, 0, 0, "64X48X8", "VESA,W:640,H:480,B:8", 640, 1920, 1080, NULL }
 };
+#else
+tGraf_spec gGraf_specs[2] = {
+    { 8, 1, 0, 320, 200, 0, 0, "32X20X8", "MCGA,W:320,H:200,B:8", 320, 320, 200, NULL },
+    { 8, 1, 0, 640, 480, 0, 0, "64X48X8", "VESA,W:640,H:480,B:8", 640, 640, 480, NULL }
+    // { 8, 1, 0, 1920, 1080, 0, 0, "64X48X8", "VESA,W:640,H:480,B:8", 640, 1920, 1080, NULL }
+};
+#endif
+
 int gASCII_table[128];
 tU32 gKeyboard_bits[8];
 int gASCII_shift_table[128];
@@ -416,6 +426,7 @@ void PDAllocateScreenAndBack(void) {
     // added by dethrace. We default to software mode unless we explicitly ask for 3dfx opengl mode
     if (harness_game_config.opengl_3dfx_mode) {
 
+        printf("3dfx mode\n");
         if (gGraf_spec_index != 0 && !gNo_voodoo) {
 
 #ifdef PLAY_NICE_WITH_GUI
@@ -439,8 +450,10 @@ void PDAllocateScreenAndBack(void) {
     if (gScreen != NULL) {
         if ((strcmp(gScreen->identifier, "Voodoo Graphics") == 0 && !gForce_voodoo_rush_mode) || gForce_voodoo_mode) {
             dr_dprintf("Voodoo Graphics mode");
+            printf("Voodoo Graphics mode");
         } else {
             dr_dprintf("Voodoo Rush mode");
+            printf("Voodoo Rush mode\n");
             gVoodoo_rush_mode = 1;
         }
         gInterpolate_textures = 1;
@@ -463,10 +476,13 @@ void PDAllocateScreenAndBack(void) {
         gInterpolate_textures = 1;
         gExceptions_general_file = "SOFTWARE";
 
+        printf("software mode\n");
+
 #ifdef PLAY_NICE_WITH_GUI
         // Render framebuffer to memory and call hooks when swapping or palette changing
         virtualfb_callbacks.palette_changed = gHarness_platform.PaletteChanged;
         virtualfb_callbacks.swap_buffers = gHarness_platform.Swap;
+        printf("new software mode\n");
         gHarness_platform.CreateWindow_("Carmageddon", gGraf_specs[gGraf_spec_index].phys_width, gGraf_specs[gGraf_spec_index].phys_height, eWindow_type_software);
         BrDevBeginVar(&gScreen, "virtualframebuffer",
             BRT_WIDTH_I32, gGraf_specs[gGraf_spec_index].phys_width,
@@ -474,6 +490,7 @@ void PDAllocateScreenAndBack(void) {
             BRT_VIRTUALFB_CALLBACKS_P, &virtualfb_callbacks,
             BR_NULL_TOKEN);
 #else
+        printf("old software mode\n");
         gScreen = BrDevBeginOld(gGraf_specs[gGraf_spec_index].gfx_init_string);
 #endif
         gDOSGfx_initialized = 1;
@@ -899,15 +916,16 @@ int original_main(int pArgc, char** pArgv) {
         }
     }
 
-#ifdef __DREAMCAST__    
+//#ifdef __DREAMCAST__    
     gGraf_spec_index = 0;
+    //gForce_voodoo_rush_mode = 1;
     gYon_multiplier = 1.0;
     gCar_simplification_level = 3;
     gCut_scene_override = 0;
     gReplay_override = 0;
     gSound_override = 0;
     gAustere_override = 1;
-#endif
+//#endif
 
     if (!gNo_voodoo) {
         gGraf_spec_index = 1;
