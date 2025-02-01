@@ -5,7 +5,7 @@
 #include "harness/hooks.h"
 #include "harness/trace.h"
 #include "sdl2_scancode_to_dinput.h"
-//#include "sdl2_gamepad_to_dinput.h"
+#include "sdl2_gamepad_to_dinput.h"
 
 SDL_Window* window;
 SDL_Renderer* renderer;
@@ -195,7 +195,7 @@ SDL_GameController *findController()
 	{
 		if (SDL_IsGameController(i))
 		{
-            printf("Controller found! %s \n", SDL_GameControllerName(SDL_GameControllerOpen(i)));
+            //printf("Controller found! %s \n", SDL_GameControllerName(SDL_GameControllerOpen(i)));
 			return SDL_GameControllerOpen(i);
 		}
 	}
@@ -210,7 +210,7 @@ static int get_and_handle_message(MSG_* msg) {
     #ifdef __DREAMCAST__
     findController();
     //checkDreamcastController();
-    SDL_GameControllerOpen(event.cdevice.which);
+    //SDL_GameControllerOpen(event.cdevice.which);
     #endif
 
     while (SDL_PollEvent(&event)) {
@@ -220,7 +220,7 @@ static int get_and_handle_message(MSG_* msg) {
             if (event.key.windowID != SDL_GetWindowID(window)) {
                 continue;
             }
-            if (event.key.keysym.sym == SDLK_RETURN) {
+            /*if (event.key.keysym.sym == SDLK_RETURN) {
                 if (event.key.type == SDL_KEYDOWN) {
                     if ((event.key.keysym.mod & (KMOD_CTRL | KMOD_SHIFT | KMOD_ALT | KMOD_GUI))) {
                         // Ignore keydown of RETURN when used together with some modifier
@@ -231,7 +231,7 @@ static int get_and_handle_message(MSG_* msg) {
                         SDL_SetWindowFullscreen(window, (SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
                     }
                 }
-            }
+            }*/
 
             printf("Key pressed: %s\n", SDL_GetKeyName(event.key.keysym.sym));
 
@@ -272,12 +272,25 @@ static int get_and_handle_message(MSG_* msg) {
 				break;
 
             case SDL_CONTROLLERBUTTONDOWN:
-             printf("Gamepad Button Pressed: %s (%d)\n", SDL_GameControllerGetStringForButton(event.cbutton.button), event.cbutton.button);
+                //printf("Gamepad Button Pressed: %s (%d)\n", SDL_GameControllerGetStringForButton(event.cbutton.button), event.cbutton.button);
            break;
             case SDL_CONTROLLERBUTTONUP:
-                dinput_key = 0x1C;
+                dinput_key = sdlGamepadToDirectInputKeyNum.buttonMapping[event.cbutton.button];
                 if (dinput_key != 0) {
+                         printf("Gamepad Button Up: %s | SDL Button: %d | Mapped DInput Key: %d\n",
+               SDL_GameControllerGetStringForButton(event.cbutton.button),
+               event.cbutton.button,
+               dinput_key);
+
+                    //directinput_key_state[dinput_key] = (event.type == SDL_CONTROLLERBUTTONDOWN ? 0x1F : 0);
                     directinput_key_state[dinput_key] = (event.type == SDL_CONTROLLERBUTTONDOWN ? 0x80 : 0);
+
+                    // Mimic keyboard behavior
+                    if (event.type == SDL_CONTROLLERBUTTONDOWN) {
+                        gKeyboard_bits[dinput_key >> 5] |= (1 << (dinput_key & 0x1F));
+                    } else {
+                        gKeyboard_bits[dinput_key >> 5] &= ~(1 << (dinput_key & 0x1F));
+                    }
                 }
                 break;
 
