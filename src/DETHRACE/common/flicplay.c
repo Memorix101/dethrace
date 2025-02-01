@@ -1961,6 +1961,7 @@ void LoadInterfaceStrings(void) {
     int i;
     int j;
     int len;
+    char *saveptr;
 
     gTranslation_count = 0;
     PathCat(the_path, gApplication_path, "TRNSLATE.TXT");
@@ -1976,9 +1977,9 @@ void LoadInterfaceStrings(void) {
     gTranslations = BrMemAllocate(gTranslation_count * sizeof(tTranslation_record), kMem_translations);
     for (i = 0; i < gTranslation_count; i++) {
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
         strcpy(s2, str);
-        strtok(s2, ".");
+        strtok_r(s2, ".", &saveptr);
         strcat(s2, ".FLI");
         gTranslations[i].flic_index = -1;
         for (j = 0; j < COUNT_OF(gMain_flic_list); j++) {
@@ -1991,14 +1992,14 @@ void LoadInterfaceStrings(void) {
             FatalError(kFatalError_FindFlicUsedInTranslationFile_S, s2);
         }
         str[strlen(str)] = ',';
-        str = strtok(s, "\t ,/");
-        str = strtok(NULL, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
+        str = strtok_r(NULL, "\t ,/", &saveptr);
         sscanf(str, "%d", &gTranslations[i].x);
-        str = strtok(NULL, "\t ,/");
+        str = strtok_r(NULL, "\t ,/", &saveptr);
         sscanf(str, "%d", &gTranslations[i].y);
-        str = strtok(NULL, "\t ,/");
+        str = strtok_r(NULL, "\t ,/", &saveptr);
         sscanf(str, "%d", &gTranslations[i].font_index);
-        str = strtok(NULL, "\t ,/");
+        str = strtok_r(NULL, "\t ,/", &saveptr);
         sscanf(str, "%c", &ch);
         switch (ch) {
         case 'C':
@@ -2014,7 +2015,7 @@ void LoadInterfaceStrings(void) {
             gTranslations[i].justification = eJust_right;
             break;
         }
-        str = strtok(NULL, "\t ,/");
+        str = strtok_r(NULL, "\t ,/", &saveptr);
         sscanf(str, "%c", &ch);
         gTranslations[i].global = ch == 'G' || ch == 'g';
         gTranslations[i].every_frame = strlen(str) > 1 && (str[1] == 'E' || str[1] == 'e');

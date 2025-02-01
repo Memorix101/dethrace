@@ -111,6 +111,7 @@ void InitSkids(void) {
     int sl;
     br_model* square;
     char* str;
+    char *saveptr;
 #if defined(DETHRACE_FIX_BUGS)
     char mat_name[32];
 #endif
@@ -131,11 +132,11 @@ void InitSkids(void) {
             }
 
 #if defined(DETHRACE_FIX_BUGS)
-            // Avoid modification of read-only data by strtok.
+            // Avoid modification of read-only data by strtok_r.
             strcpy(mat_name, str);
             str = mat_name;
 #endif
-            sl = strlen(strtok(str, "."));
+            sl = strlen(strtok_r(str, ".", &saveptr));
             strcpy(str + sl, ".PIX");
             BrMapAdd(LoadPixelmap(str));
             strcpy(str + sl, ".MAT");

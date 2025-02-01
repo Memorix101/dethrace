@@ -54,6 +54,45 @@ if(DETHRACE_REPLAY_DEBUG)
     target_compile_definitions(dethrace_obj PRIVATE DETHRACE_REPLAY_DEBUG)
 endif()
 
+set(COMMON_COMPILE_FLAGS
+    -O3
+
+    #-fno-math-errno
+        #-fno-signed-zeros
+    #-fno-trapping-math
+    #-fassociative-math
+    #-freciprocal-math
+        #-funsafe-math-optimizations
+        #-ffinite-math-only
+    #-fno-rounding-math
+    #-fcx-limited-range
+    #-fno-signaling-nans
+    #-fexcess-precision=fast
+
+    #-fno-lto 
+    -fbuiltin 
+    -flto=auto
+    -ffast-math 
+    #-mfsca 
+    #-mfsrra
+    -ffp-contract=fast
+)
+target_compile_options(dethrace_obj PRIVATE ${COMMON_COMPILE_FLAGS})
+
+set(OPTIMIZED_FILES 
+    common/car.c 
+    common/controls.c 
+    common/crush.c 
+    common/displays.c 
+    #common/netgame.c 
+    common/utility.c
+)
+
+set_source_files_properties(
+    ${OPTIMIZED_FILES}
+    PROPERTIES COMPILE_FLAGS "-fno-builtin -fno-lto -fno-fast-math"
+)
+
 target_sources(dethrace_obj PRIVATE
     common/brucetrk.c
     common/brucetrk.h

@@ -299,13 +299,14 @@ int LoadNPixelmaps(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     char s[256];
     char* str;
     br_pixelmap* temp_array[200];
+    char *saveptr;
     LOG_TRACE("(%p, %p, %d)", pStorage_space, pF, pCount);
 
     new_ones = 0;
     for (i = 0; i < pCount; ++i) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
         PathCat(the_path, gApplication_path, gGraf_specs[gGraf_spec_index].data_dir_name);
         PathCat(the_path, the_path, "PIXELMAP");
         PathCat(the_path, the_path, str);
@@ -403,13 +404,14 @@ int LoadNShadeTables(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     char s[256];
     char* str;
     br_pixelmap* temp_array[50];
+    char *saveptr;
     LOG_TRACE("(%p, %p, %d)", pStorage_space, pF, pCount);
 
     new_ones = 0;
     for (i = 0; i < pCount; i++) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
         PathCat(the_path, gApplication_path, "SHADETAB");
         PathCat(the_path, the_path, str);
         total = DRPixelmapLoadMany(the_path, temp_array, 50);
@@ -474,13 +476,14 @@ int LoadNMaterials(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     char s[256];
     char* str;
     br_material* temp_array[200];
+    char *saveptr;
     LOG_TRACE("(%p, %p, %d)", pStorage_space, pF, pCount);
 
     new_ones = 0;
     for (i = 0; i < pCount; ++i) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
         PathCat(the_path, gApplication_path, "MATERIAL");
         PathCat(the_path, the_path, str);
         total = BrMaterialLoadMany(the_path, temp_array, 200);
@@ -521,13 +524,14 @@ int LoadNModels(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     br_model* temp_array[2000];
     struct v11model* prepared;
     int group;
+    char *saveptr;
     LOG_TRACE("(%p, %p, %d)", pStorage_space, pF, pCount);
 
     new_ones = 0;
     for (i = 0; i < pCount; i++) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
         PathCat(the_path, gApplication_path, "MODELS");
         PathCat(the_path, the_path, str);
         total = BrModelLoadMany(the_path, temp_array, 2000);
@@ -726,12 +730,13 @@ int LoadNTrackModels(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     char* str;
     br_model* temp_array[2000];
     struct v11model* prepared;
+    char *saveptr;
     LOG_TRACE("(%p, %p, %d)", pStorage_space, pF, pCount);
 
     new_ones = 0;
     for (i = 0; i < pCount; i++) {
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
         PathCat(the_path, gApplication_path, "MODELS");
         PathCat(the_path, the_path, str);
         total = BrModelLoadMany(the_path, temp_array, 2000);
@@ -785,10 +790,11 @@ void LoadSomePixelmaps(tBrender_storage* pStorage_space, FILE* pF) {
     char s[256];
     char* str;
     br_pixelmap* temp_array[200];
+    char *saveptr;
     LOG_TRACE("(%p, %p)", pStorage_space, pF);
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = strtok_r(s, "\t ,/", &saveptr);
     sscanf(str, "%d", &count);
     LoadNPixelmaps(pStorage_space, pF, count);
 }
@@ -803,10 +809,11 @@ void LoadSomeShadeTables(tBrender_storage* pStorage_space, FILE* pF) {
     char s[256];
     char* str;
     br_pixelmap* temp_array[50];
+    char *saveptr;
     LOG_TRACE("(%p, %p)", pStorage_space, pF);
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = strtok_r(s, "\t ,/", &saveptr);
     sscanf(str, "%d", &count);
     LoadNShadeTables(pStorage_space, pF, count);
 }
@@ -821,10 +828,11 @@ void LoadSomeMaterials(tBrender_storage* pStorage_space, FILE* pF) {
     char s[256];
     char* str;
     br_material* temp_array[200];
+    char *saveptr;
     LOG_TRACE("(%p, %p)", pStorage_space, pF);
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = strtok_r(s, "\t ,/", &saveptr);
     sscanf(str, "%d", &count);
     LoadNMaterials(pStorage_space, pF, count);
 }
@@ -839,10 +847,11 @@ void LoadSomeModels(tBrender_storage* pStorage_space, FILE* pF) {
     char s[256];
     char* str;
     br_model* temp_array[2000];
+    char *saveptr;
     LOG_TRACE("(%p, %p)", pStorage_space, pF);
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = strtok_r(s, "\t ,/", &saveptr);
     sscanf(str, "%d", &count);
     LoadNModels(pStorage_space, pF, count);
 }
@@ -857,10 +866,11 @@ void LoadSomeTrackModels(tBrender_storage* pStorage_space, FILE* pF) {
     char s[256];
     char* str;
     br_model* temp_array[2000];
+    char *saveptr;
     LOG_TRACE("(%p, %p)", pStorage_space, pF);
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = strtok_r(s, "\t ,/", &saveptr);
     sscanf(str, "%d", &count);
     LoadNTrackModels(pStorage_space, pF, count);
 }
@@ -1118,6 +1128,7 @@ void AddFunkotronics(FILE* pF, int pOwner, int pRef_offset) {
     float x_1;
     int d_0;
     int d_1;
+    char *saveptr;
     LOG_TRACE("(%p, %d, %d)", pF, pOwner, pRef_offset);
 
     first_time = 1;
@@ -1138,7 +1149,7 @@ void AddFunkotronics(FILE* pF, int pOwner, int pRef_offset) {
 
         the_funk = AddNewFunkotronic();
         the_funk->owner = pOwner;
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
         the_funk->material = BrMaterialFind(str);
         if (the_funk->material == NULL) {
             FatalError(kFatalError_FindMaterialUsedByFunkotronicFile_S, str);
@@ -1439,6 +1450,7 @@ void AddGroovidelics(FILE* pF, int pOwner, br_actor* pParent_actor, int pRef_off
     int d_0;
     int d_1;
     int d_2;
+    char *saveptr;
     LOG_TRACE("(%p, %d, %p, %d, %d)", pF, pOwner, pParent_actor, pRef_offset, pAllowed_to_be_absent);
 
     first_time = 1;
@@ -1457,7 +1469,7 @@ void AddGroovidelics(FILE* pF, int pOwner, br_actor* pParent_actor, int pRef_off
             GetALineAndDontArgue(pF, s);
         }
         first_time = 0;
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
         the_groove = AddNewGroovidelic();
         the_groove->owner = pOwner;
         the_groove->actor = DRActorFindRecurse(pParent_actor, str);
@@ -2415,24 +2427,25 @@ void LoadExceptionsFile(char* pName) {
     int file_version;
     tException_list e;
     char delimiters[4];
+    char *saveptr;
     LOG_TRACE("(\"%s\")", pName);
 
     strcpy(delimiters, "\t ,");
     f = DRfopen(pName, "rt");
     if (f) {
         GetALineAndDontArgue(f, line);
-        tok = strtok(line, delimiters);
+        tok = strtok_r(line, delimiters, &saveptr);
         if (DRStricmp(tok, "VERSION")) {
             FatalError(120, pName, "VERSION");
         }
-        tok = strtok(NULL, delimiters);
+        tok = strtok_r(NULL, delimiters, &saveptr);
         if (sscanf(tok, "%d", &file_version) == 0 || file_version != 1) {
             FatalError(121, tok, pName);
         }
 
         while (1) {
             GetALineAndDontArgue(f, line);
-            tok = strtok(line, delimiters);
+            tok = strtok_r(line, delimiters, &saveptr);
             if (DRStricmp(tok, "end") == 0) {
                 break;
             }
@@ -2441,7 +2454,7 @@ void LoadExceptionsFile(char* pName) {
             strcpy(e->name, tok);
             e->flags = 0;
             while (1) {
-                tok = strtok(NULL, delimiters);
+                tok = strtok_r(NULL, delimiters, &saveptr);
                 if (tok == NULL /*|| (IsTable[(unsigned __int8)(*v11 + 1)] & 0xE0) == 0*/) {
                     break;
                 }
@@ -2539,6 +2552,7 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
     tPed_subs* ped_subs;
     br_pixelmap* sky;
     br_material* material;
+    char *saveptr;
     LOG_TRACE("(\"%s\", %p, %p)", pFile_name, pTrack_spec, pRace_info);
 
     killed_sky = 0;
@@ -2552,26 +2566,26 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
         FatalError(kFatalError_OpenRacesFile);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = strtok_r(s, "\t ,/", &saveptr);
     if (strcmp(str, "VERSION") == 0) {
-        str = strtok(NULL, "\t ,/");
+        str = strtok_r(NULL, "\t ,/", &saveptr);
         sscanf(str, "%d", &gRace_file_version);
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
     } else {
         gRace_file_version = 0;
     }
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_position.v[0] = temp_float;
-    str = strtok(0, "\t ,/");
+    str = strtok_r(0, "\t ,/", &saveptr);
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_position.v[1] = temp_float;
-    str = strtok(0, "\t ,/");
+    str = strtok_r(0, "\t ,/", &saveptr);
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_position.v[2] = temp_float;
     PossibleService();
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = strtok_r(s, "\t ,/", &saveptr);
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_yaw = temp_float;
     GetThreeInts(f, pRace_info->initial_timer, &pRace_info->initial_timer[1], &pRace_info->initial_timer[2]);
@@ -2682,18 +2696,18 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
     PrintMemoryDump(0, "JUST LOADED IN TEXTURES/MATS/MODELS FOR TRACK");
     if (gRace_file_version <= 5) {
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
         PathCat(the_path, gApplication_path, "ACTORS");
         PathCat(the_path, the_path, str);
     } else if (gAusterity_mode) {
         GetALineAndDontArgue(f, s);
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
         PathCat(the_path, gApplication_path, "ACTORS");
         PathCat(the_path, the_path, str);
     } else {
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = strtok_r(s, "\t ,/", &saveptr);
         PathCat(the_path, gApplication_path, "ACTORS");
         PathCat(the_path, the_path, str);
         GetALineAndDontArgue(f, s);
@@ -2734,15 +2748,15 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
     }
     BrActorAdd(gUniverse_actor, pTrack_spec->the_actor);
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
-    str = strtok(str, ".");
+    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok_r(str, ".", &saveptr);
     strcat(str, ".DAT");
     PathCat(gAdditional_model_path, gApplication_path, "MODELS");
     PathCat(gAdditional_model_path, gAdditional_model_path, str);
     gNumber_of_additional_models = 0;
     PossibleService();
-    str = strtok(s, "\t ,/");
-    str = strtok(str, ".");
+    str = strtok_r(s, "\t ,/", &saveptr);
+    str = strtok_r(str, ".", &saveptr);
     strcat(str, ".ACT");
     PathCat(gAdditional_actor_path, gApplication_path, "ACTORS");
     PathCat(gAdditional_actor_path, gAdditional_actor_path, str);
@@ -2832,11 +2846,11 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
             } else {
                 TELL_ME_IF_WE_PASS_THIS_WAY();
                 spec->no_mat = 0;
-                str = strtok(s, "\t ,/");
+                str = strtok_r(s, "\t ,/", &saveptr);
                 sscanf(str, "%f", &spec->bounds.min.v[0]);
-                str = strtok(0, "\t ,/");
+                str = strtok_r(0, "\t ,/", &saveptr);
                 sscanf(str, "%f", &spec->bounds.min.v[1]);
-                str = strtok(0, "\t ,/");
+                str = strtok_r(0, "\t ,/", &saveptr);
                 sscanf(str, "%f", &spec->bounds.min.v[2]);
                 GetThreeScalars(f, &spec->bounds.max.v[0], &spec->bounds.max.v[1], &spec->bounds.max.v[2]);
                 BrMatrix34Identity(&spec->mat);
@@ -2932,7 +2946,7 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
         pRace_info->material_modifiers[i].sparkiness = GetAScalar(f);
         pRace_info->material_modifiers[i].smoke_type = GetAnInt(f);
         GetAString(f, s);
-        str = strtok(s, ".");
+        str = strtok_r(s, ".", &saveptr);
 
         if (!strcmp(s, "none") || !strcmp(s, "NONE") || !strcmp(s, "0") || !strcmp(s, "1")) {
             pRace_info->material_modifiers[i].skid_mark_material = NULL;
@@ -4377,13 +4391,14 @@ br_uint_32 CalcHighestID(br_actor* pActor, int* pHighest) {
 // IDA: br_uint_32 __cdecl SetID(br_actor *pActor, void *pArg)
 br_uint_32 SetID(br_actor* pActor, void* pArg) {
     char s[256];
+    char *saveptr;
     LOG_TRACE("(%p, %p)", pActor, pArg);
 
     if (pActor->identifier == NULL) {
         return 0;
     }
     strcpy(s, pActor->identifier);
-    strtok(s, ".");
+    strtok_r(s, ".", &saveptr);
     strcat(s, "0000");
     sprintf(&s[4], "%04d", (int)(intptr_t)pArg);
     strcat(s, ".ACT");
@@ -4423,6 +4438,7 @@ void AccessoryHeadup(br_actor* pActor, char* pPrefix) {
 br_uint_32 CalcHighestNonAmID(br_actor* pActor, int* pHighest) {
     char s[256];
     int number;
+    char *saveptr;
     LOG_TRACE("(%p, %p)", pActor, pHighest);
 
     if (pActor->identifier == NULL || pActor->identifier[0] == '&') {
@@ -4430,7 +4446,7 @@ br_uint_32 CalcHighestNonAmID(br_actor* pActor, int* pHighest) {
     }
     if (strlen(pActor->identifier) == 12) {
         strcpy(s, &pActor->identifier[4]);
-        strtok(s, ".");
+        strtok_r(s, ".", &saveptr);
         sscanf(s, "%d", &number);
     } else {
         number = 0;
@@ -4446,6 +4462,7 @@ br_uint_32 SetIDAndDupModel(br_actor* pActor, void* pArg) {
     char s[256];
     char s2[256];
     br_model* new_model;
+    char *saveptr;
     LOG_TRACE("(%p, %p)", pActor, pArg);
 
     if (pActor->identifier == NULL || pActor->identifier[0] == '@') {
@@ -4454,7 +4471,7 @@ br_uint_32 SetIDAndDupModel(br_actor* pActor, void* pArg) {
     *(int*)(uintptr_t)pArg = *(int*)(uintptr_t)pArg + 1;
     strcpy(s, pActor->identifier);
     s[0] = '@';
-    strtok(s, ".");
+    strtok_r(s, ".", &saveptr);
     strcat(s, "0000");
     sprintf(&s[4], "%04d", *(int*)(uintptr_t)pArg);
     strcpy(s2, s);
