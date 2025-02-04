@@ -1119,7 +1119,7 @@ void SmokeCircle3D(br_vector3* o, br_scalar r, br_scalar strength, br_scalar pAs
         scaled_r = gCameraToScreen.m[0][0] * r / -p.v[2];
         extra_z = gCameraToScreen.m[3][2] * r / (p.v[2] * p.v[2]);
         BrMatrix4ApplyP(&o2, &p, &gCameraToScreen);
-        BrVector3InvScale(&p, (const br_vector3 *)&o2, o2.v[3]);
+        BrVector3InvScale(&p, &o2, o2.v[3]);
         SmokeCircle(&p, (br_scalar)scaled_r, extra_z, strength, pAspect, pRender_screen, pDepth_buffer, pShade_table);
     }
 }

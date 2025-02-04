@@ -1,33 +1,28 @@
-#include <SDL.h>
+#include <SDL2/SDL.h>
 
-// Define a struct for mapping SDL buttons and axes to DirectInput keys
-typedef struct {
-    int buttonMapping[SDL_CONTROLLER_BUTTON_MAX];  // Button to DirectInput key
-    int axisPositive[SDL_CONTROLLER_AXIS_MAX];     // Axis + direction to DirectInput key
-    int axisNegative[SDL_CONTROLLER_AXIS_MAX];     // Axis - direction to DirectInput key
-} GamepadMapping;
+// Map some SDL gamepad buttons to DInput keys
 
-// Define the mappings
-static GamepadMapping sdlGamepadToDirectInputKeyNum = {
-    .buttonMapping = {
-        [SDL_CONTROLLER_BUTTON_A] = 0x1C,  // SDL_SCANCODE_RETURN
-        [SDL_CONTROLLER_BUTTON_B] = 0xD2,  // SDL_SCANCODE_INSERT -> Reset
-        [SDL_CONTROLLER_BUTTON_X] = 0x39,  // SDL_SCANCODE_SPACE
-        [SDL_CONTROLLER_BUTTON_Y] = 0x0E,  // SDL_SCANCODE_BACKSPACE -> Repair
-        [SDL_CONTROLLER_BUTTON_START] = 0x01, // ESCAPE (Pause/Menu)
-        [SDL_CONTROLLER_BUTTON_DPAD_UP] = 0x48, // UP
-        [SDL_CONTROLLER_BUTTON_DPAD_DOWN] = 0x50, // DOWN
-        [SDL_CONTROLLER_BUTTON_DPAD_LEFT] = 0x4B, // LEFT
-        [SDL_CONTROLLER_BUTTON_DPAD_RIGHT] = 0x4D  // RIGHT
-    },
-    .axisPositive = {
-        [SDL_CONTROLLER_AXIS_TRIGGERRIGHT] = 0x48,  // SDL_SCANCODE_UP
-        [SDL_CONTROLLER_AXIS_TRIGGERLEFT]  = 0x50,  // SDL_SCANCODE_DOWN
-        [SDL_CONTROLLER_AXIS_LEFTX] = 0x4B, // SDL_SCANCODE_LEFT
-        [SDL_CONTROLLER_AXIS_LEFTY] = 0x2E  // SDL_SCANCODE_C
-    },
-    .axisNegative = {
-        [SDL_CONTROLLER_AXIS_LEFTX] = 0x0F, // SDL_SCANCODE_TAB
-        [SDL_CONTROLLER_AXIS_LEFTY] = 0x48  // SDL_SCANCODE_UP
-    }
+static int sdlGamepadToDirectInputKeyNum[SDL_CONTROLLER_BUTTON_MAX] = {
+  0x48, // SDL_CONTROLLER_BUTTON_A -> KP_8
+  0x4C, // SDL_CONTROLLER_BUTTON_B -> KP_5
+  0x39, // SDL_CONTROLLER_BUTTON_X -> SPACEBAR
+  0x2E, // SDL_CONTROLLER_BUTTON_Y -> C
+  0x0F, // SDL_CONTROLLER_BUTTON_BACK -> TAB
+  0x00, // SDL_CONTROLLER_BUTTON_GUIDE -> None
+  0x01, // SDL_CONTROLLER_BUTTON_START -> ESCAPE
+  0x00, // SDL_CONTROLLER_BUTTON_LEFTSTICK -> None
+  0x00, // SDL_CONTROLLER_BUTTON_RIGHTSTICK -> None
+  0x00, // SDL_CONTROLLER_BUTTON_LEFTSHOULDER -> None
+  0x1C, // SDL_CONTROLLER_BUTTON_RIGHTSHOULDER -> RETURN
+/*
+  0xC8, // SDL_CONTROLLER_BUTTON_DPAD_UP -> UP
+  0xD0, // SDL_CONTROLLER_BUTTON_DPAD_DOWN -> DOWN
+  0xCB, // SDL_CONTROLLER_BUTTON_DPAD_LEFT -> LEFT
+  0xCD  // SDL_CONTROLLER_BUTTON_DPAD_RIGHT -> RIGHT
+*/
+
+  0x17, // SDL_CONTROLLER_BUTTON_DPAD_UP -> I
+  0x24, // SDL_CONTROLLER_BUTTON_DPAD_LEFT -> J
+  0x25, // SDL_CONTROLLER_BUTTON_DPAD_DOWN -> K
+  0x26  // SDL_CONTROLLER_BUTTON_DPAD_RIGHT -> L
 };

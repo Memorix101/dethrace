@@ -1832,6 +1832,8 @@ void RotateCarFirstOrder(tCollision_info* c, br_scalar dt) {
     c->omega.v[2] = L2.v[2] / c->I.v[2];
 }
 
+#include <pspfpu.h>
+
 // IDA: void __usercall SimpleRotate(tCollision_info *c@<EAX>, br_scalar dt)
 void SimpleRotate(tCollision_info* c, br_scalar dt) {
     br_vector3 axis;

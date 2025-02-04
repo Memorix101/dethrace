@@ -1,4 +1,4 @@
-#include <SDL.h>
+#include <SDL2/SDL.h>
 
 #include "harness.h"
 #include "harness/config.h"
@@ -10,17 +10,32 @@
 SDL_Window* window;
 SDL_Renderer* renderer;
 SDL_Texture* screen_texture;
-uint32_t converted_palette[256];
+uint32_t __attribute__((aligned(16))) converted_palette[256];
 br_pixelmap* last_screen_src;
 int render_width, render_height;
 
-Uint32 last_frame_time;
+#include <memory.h>
+#include <pspctrl.h>
+#include <pspdebug.h>
+#include <psppower.h>
+#include <pspdisplay.h>
+#include <pspgu.h>
+#include <pspkernel.h>
+#include <psprtc.h>
 
+
+PSP_MODULE_INFO("DETHRACE", 0, 1, 0);
+PSP_MAIN_THREAD_ATTR(THREAD_ATTR_USER);
+//PSP_HEAP_THRESHOLD_SIZE_KB(1024);
+PSP_MAIN_THREAD_STACK_SIZE_KB(2048);
+
+Uint32 last_frame_time;
+char list[0x20000] __attribute__((aligned(64)));
 uint8_t directinput_key_state[SDL_NUM_SCANCODES];
 
 static void* create_window_and_renderer(char* title, int x, int y, int width, int height) {
-    render_width = width;
-    render_height = height;
+    render_width = 320;
+    render_height = 200;
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         LOG_PANIC("SDL_INIT_VIDEO error: %s", SDL_GetError());
@@ -33,7 +48,7 @@ static void* create_window_and_renderer(char* title, int x, int y, int width, in
     window = SDL_CreateWindow(title,
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED,
-        width, height,
+        320, 200,
         SDL_WINDOW_RESIZABLE);
 
     if (window == NULL) {
@@ -49,9 +64,9 @@ static void* create_window_and_renderer(char* title, int x, int y, int width, in
         LOG_PANIC("Failed to create renderer: %s", SDL_GetError());
     }
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-    SDL_RenderSetLogicalSize(renderer, render_width, render_height);
+    //SDL_RenderSetLogicalSize(renderer, render_width, render_height);
 
-    screen_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, width, height);
+    screen_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, 320, 200);
     if (screen_texture == NULL) {
         SDL_RendererInfo info;
         SDL_GetRendererInfo(renderer, &info);
@@ -61,14 +76,49 @@ static void* create_window_and_renderer(char* title, int x, int y, int width, in
         LOG_PANIC("Failed to create screen_texture: %s", SDL_GetError());
     }
 
+    // https://pspdev.github.io/basic_programs.html
+#define BUFFER_WIDTH 512
+#define BUFFER_HEIGHT 272
+#define SCREEN_WIDTH 480
+#define SCREEN_HEIGHT BUFFER_HEIGHT
+	// setup GU
+	scePowerSetClockFrequency(333, 333, 166);
+	pspDebugScreenInit();
+	// setupCallbacks();
+
+	// Setup GU
+	void *fbp0 = guGetStaticVramBuffer(BUFFER_WIDTH, SCREEN_HEIGHT, GU_PSM_8888);
+	void *fbp1 = guGetStaticVramBuffer(BUFFER_WIDTH, SCREEN_HEIGHT, GU_PSM_8888);
+
+	sceGuInit();
+
+	// Set up buffers
+	sceGuStart(GU_DIRECT, list);
+	sceGuDrawBuffer(GU_PSM_8888, fbp0, BUFFER_WIDTH);
+	sceGuDispBuffer(SCREEN_WIDTH, SCREEN_HEIGHT, fbp1, BUFFER_WIDTH);
+
+	// We do not care about the depth buffer in this example
+	sceGuDepthBuffer(fbp0, 0);	 // Set depth buffer to a length of 0
+	sceGuDisable(GU_DEPTH_TEST); // Disable depth testing
+
+	// Set up viewport
+	sceGuOffset(2048 - (SCREEN_WIDTH / 2), 2048 - (SCREEN_HEIGHT / 2));
+	sceGuViewport(2048, 2048, SCREEN_WIDTH, SCREEN_HEIGHT);
+	sceGuEnable(GU_SCISSOR_TEST);
+	sceGuScissor(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+	// Start a new frame and enable the display
+	sceGuFinish();
+	sceGuDisplay(GU_TRUE);
+
     return window;
 }
 
 static int set_window_pos(void* hWnd, int x, int y, int nWidth, int nHeight) {
     // SDL_SetWindowPosition(hWnd, x, y);
     if (nWidth == 320 && nHeight == 200) {
-        nWidth = 640;
-        nHeight = 400;
+        nWidth = 320;
+        nHeight = 200;
     }
     SDL_SetWindowSize(hWnd, nWidth, nHeight);
     return 0;
@@ -235,33 +285,64 @@ static void limit_fps(void) {
     last_frame_time = SDL_GetTicks();
 }
 
+static unsigned int __attribute__((aligned(16))) pixels[512 * 272];
+
 static void present_screen(br_pixelmap* src) {
     // fastest way to convert 8 bit indexed to 32 bit
     uint8_t* src_pixels = src->pixels;
-    uint32_t* dest_pixels;
-    int dest_pitch;
+    // uint32_t* dest_pixels = 0;
 
-    SDL_LockTexture(screen_texture, NULL, (void**)&dest_pixels, &dest_pitch);
-    for (int i = 0; i < src->height * src->width; i++) {
-        *dest_pixels = converted_palette[*src_pixels];
-        dest_pixels++;
-        src_pixels++;
+    for (unsigned int x = 0; x < 512; x++) {
+        for (unsigned int y = 0; y < 272; y++) {
+            if (x < src->width && y < src->height) {
+                int i = (y * 512) + x;
+                uint8_t pixel = src_pixels[(y * src->width) + x];
+
+                uint32_t c = converted_palette[pixel];
+                pixels[i] = c;
+            }
+        }
     }
-    SDL_UnlockTexture(screen_texture);
-    SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, screen_texture, NULL, NULL);
-    SDL_RenderPresent(renderer);
+
+    sceKernelDcacheWritebackAll();
+
+    // begin
+sceGuStart(GU_DIRECT, list);
+
+// clear
+//sceGuClearColor(GU_RGBA(255, 255, 255, 255)); // white
+//sceGuClear(GU_COLOR_BUFFER_BIT | GU_DEPTH_BUFFER_BIT);
+
+// Set the buffer correctly
+void* framebuffer = 0;
+sceGuDrawBuffer(GU_PSM_8888, framebuffer, 512);
+
+// Draw texture to framebuffer
+sceGuCopyImage(GU_PSM_8888, 0, 0, 480, 272, 512, pixels, 0, 0, 512, (void*)(((unsigned int)framebuffer)+0x4000000));
+sceGuTexSync();
+
+// Finish rendering and wait for VBlank
+sceGuFinish();
+sceGuSync(0, 0);
+sceDisplayWaitVblankStart();
+sceDisplaySetFrameBuf(framebuffer, 512, GU_PSM_8888, PSP_DISPLAY_SETBUF_NEXTFRAME);
+
+// Swap buffers after waiting for VBlank
+framebuffer = sceGuSwapBuffers();
+
 
     last_screen_src = src;
 
-    if (harness_game_config.fps != 0) {
+    SDL_Delay(16);
+
+   /*if (harness_game_config.fps != 0) {
         limit_fps();
-    }
+    }*/
 }
 
 static void set_palette(PALETTEENTRY_* pal) {
     for (int i = 0; i < 256; i++) {
-        converted_palette[i] = (0xff << 24 | pal[i].peRed << 16 | pal[i].peGreen << 8 | pal[i].peBlue);
+        converted_palette[i] = (0xff << 24 | pal[i].peBlue << 16 | pal[i].peGreen << 8 | pal[i].peRed);
     }
     if (last_screen_src != NULL) {
         present_screen(last_screen_src);

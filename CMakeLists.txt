@@ -57,23 +57,7 @@ function(add_compile_flags_if_supported TARGET)
     endforeach()
 endfunction()
 
-if(DEFINED __DREAMCAST__)
-    set(PLATFORM_DREAMCAST TRUE)
-    add_compile_options(
-    -fno-lto
-    #-flto=auto
-    -Wno-incompatible-pointer-types 
-    -fbuiltin
-    -ffast-math
-    #-Wint-conversion
-    )
-endif()
-
-IF (NOT __DREAMCAST__)
-    test_big_endian(IS_BIGENDIAN)
-else()
-    set(IS_BIGENDIAN 0)
-endif()
+test_big_endian(IS_BIGENDIAN)
 
 find_package(SDL2 CONFIG)
 if(NOT SDL2_FOUND)

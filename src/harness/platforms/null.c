@@ -1,7 +1,7 @@
 #include "null.h"
+#include <string.h>
 
-// todo: shouldnt depend on sdl...
-#include <SDL.h>
+// #include <SDL.h>
 
 static void* null_create_window_and_renderer(char* title, int x, int y, int width, int height) {
     return 0;
@@ -42,9 +42,8 @@ static void null_set_palette(PALETTEENTRY_* palette) {
 
 void Null_Platform_Init(tHarness_platform* platform) {
     platform->ProcessWindowMessages = null_get_and_handle_message;
-    // todo: shouldnt depend on sdl...
-    platform->Sleep = SDL_Delay;
-    platform->GetTicks = SDL_GetTicks;
+    platform->Sleep = NULL;
+    platform->GetTicks = NULL;
     platform->CreateWindowAndRenderer = null_create_window_and_renderer;
     platform->ShowCursor = null_show_cursor;
     platform->SetWindowPos = null_set_window_pos;
@@ -53,6 +52,5 @@ void Null_Platform_Init(tHarness_platform* platform) {
     platform->GetMousePosition = null_get_mouse_position;
     platform->GetMouseButtons = null_get_mouse_buttons;
     platform->ShowErrorMessage = null_show_error_message;
-
     platform->Renderer_SetPalette = null_set_palette;
 }

@@ -2,17 +2,17 @@ configure_file(version.h.in version.h @ONLY)
 
 add_library(harness STATIC)
 
-if (NOT DEFINED IO_PLATFORM)
+if(NOT DEFINED IO_PLATFORM)
     set(IO_PLATFORM "SDL2")
 endif()
 
 target_include_directories(harness
     PRIVATE
-        .
-        ${CMAKE_SOURCE_DIR}
-        "${CMAKE_CURRENT_BINARY_DIR}"
+    .
+    ${CMAKE_SOURCE_DIR}
+    "${CMAKE_CURRENT_BINARY_DIR}"
     PUBLIC
-        include
+    include
 )
 
 if(DETHRACE_FIX_BUGS)
@@ -58,18 +58,30 @@ target_sources(harness PRIVATE
     win95/winsock.c
     platforms/null.c
     platforms/null.h
-    vmu_profiler.c
 
     "${CMAKE_CURRENT_BINARY_DIR}/version.h"
 )
 
-if (IO_PLATFORM STREQUAL "SDL2")
+if(IO_PLATFORM STREQUAL "SDL2")
     target_sources(harness PRIVATE
         platforms/sdl2.c
-        #platforms/dc_pvr.c
         platforms/sdl2_scancode_to_dinput.h
+        platforms/sdl2_gamepad_to_dinput.h
     )
     target_link_libraries(harness PRIVATE SDL2::SDL2)
+endif()
+
+if(IO_PLATFORM STREQUAL "PSP")
+    target_sources(harness PRIVATE
+        platforms/psp.c
+    )
+
+    target_link_libraries(harness PRIVATE ${PSP_LIBRARIES}
+        pspgu
+        pspge
+        pspdisplay
+        pspdebug
+        atomic)
 endif()
 
 if(WIN32)
@@ -80,6 +92,10 @@ if(WIN32)
 elseif(APPLE)
     target_sources(harness PRIVATE
         os/macos.c
+    )
+elseif(PSP)
+    target_sources(harness PRIVATE
+        os/psp.c
     )
 else()
     target_sources(harness PRIVATE

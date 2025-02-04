@@ -20,7 +20,7 @@
  *
  */
 
-#include <SDL.h>
+#include <SDL2/SDL.h>
 
 #if 0 // Usage Example:
 #include "sdl2_scancode_to_dinput.h"
@@ -58,7 +58,6 @@
 // (#define DIK_ABNT_C2         0x7E    /* Numpad . on Brazilian keyboard */ - system should map this to KP_COMMA or something,
 //                                         according to USB doc, so probably it doesn't need mapping here)
 
-#ifndef __DREAMCAST__
 // maps SDL2 scancodes to directinput keynums/scancodes - dinput_key = sdlScanCodeToDirectInputKeyNum[(int)your_sdl2_scancode];
 static int sdlScanCodeToDirectInputKeyNum[SDL_NUM_SCANCODES] = {
     0x0,  //	SDL_SCANCODE_UNKNOWN = 0, => 0 should also work for dinput codes as "not assigned/unknown"
@@ -147,10 +146,10 @@ static int sdlScanCodeToDirectInputKeyNum[SDL_NUM_SCANCODES] = {
     0xD3, //	SDL_SCANCODE_DELETE = 76, - DIK_DELETE
     0xCF, //	SDL_SCANCODE_END = 77, - DIK_END
     0xD1, //	SDL_SCANCODE_PAGEDOWN = 78, - DIK_NEXT
-    0x4D, //	SDL_SCANCODE_RIGHT = 79, - DIK_RIGHT
-    0x4B, //	SDL_SCANCODE_LEFT = 80, - DIK_LEFT
-    0x50, //	SDL_SCANCODE_DOWN = 81, - DIK_DOWN
-    0x48, //	SDL_SCANCODE_UP = 82, - DIK_UP
+    0xCD, //	SDL_SCANCODE_RIGHT = 79, - DIK_RIGHT
+    0xCB, //	SDL_SCANCODE_LEFT = 80, - DIK_LEFT
+    0xD0, //	SDL_SCANCODE_DOWN = 81, - DIK_DOWN
+    0xC8, //	SDL_SCANCODE_UP = 82, - DIK_UP
 
     0x45, //	SDL_SCANCODE_NUMLOCKCLEAR = 83, // num lock on PC, clear on Mac keyboards - DIK_NUMLOCK
 
@@ -158,7 +157,7 @@ static int sdlScanCodeToDirectInputKeyNum[SDL_NUM_SCANCODES] = {
     0x37, //	SDL_SCANCODE_KP_MULTIPLY = 85, - DIK_MULTIPLY
     0x4A, //	SDL_SCANCODE_KP_MINUS = 86, - DIK_SUBTRACT
     0x4E, //	SDL_SCANCODE_KP_PLUS = 87, - DIK_ADD
-    0x1C, //	SDL_SCANCODE_KP_ENTER = 88, - DIK_NUMPADENTER
+    0x9C, //	SDL_SCANCODE_KP_ENTER = 88, - DIK_NUMPADENTER
     0x4F, //	SDL_SCANCODE_KP_1 = 89, - DIK_NUMPAD1
     0x50, //	SDL_SCANCODE_KP_2 = 90, - DIK_NUMPAD2
     0x51, //	SDL_SCANCODE_KP_3 = 91, - DIK_NUMPAD3
@@ -387,94 +386,5 @@ static int sdlScanCodeToDirectInputKeyNum[SDL_NUM_SCANCODES] = {
 
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 // 501-511 unused
 };
-#else
-static int sdlScanCodeToDirectInputKeyNum[SDL_NUM_SCANCODES] = {
-    [SDL_SCANCODE_UNKNOWN] = 0x00,
-    [SDL_SCANCODE_ESCAPE] = 0x01,
-    [SDL_SCANCODE_1] = 0x02,
-    [SDL_SCANCODE_2] = 0x03,
-    [SDL_SCANCODE_3] = 0x04,
-    [SDL_SCANCODE_4] = 0x05,
-    [SDL_SCANCODE_5] = 0x06,
-    [SDL_SCANCODE_6] = 0x07,
-    [SDL_SCANCODE_7] = 0x08,
-    [SDL_SCANCODE_8] = 0x09,
-    [SDL_SCANCODE_9] = 0x0A,
-    [SDL_SCANCODE_0] = 0x0B,
-    [SDL_SCANCODE_MINUS] = 0x0C,
-    [SDL_SCANCODE_EQUALS] = 0x0D,
-    [SDL_SCANCODE_BACKSPACE] = 0x0E,
-    [SDL_SCANCODE_TAB] = 0x0F,
-    [SDL_SCANCODE_Q] = 0x10,
-    [SDL_SCANCODE_W] = 0x11,
-    [SDL_SCANCODE_E] = 0x12,
-    [SDL_SCANCODE_R] = 0x13,
-    [SDL_SCANCODE_T] = 0x14,
-    [SDL_SCANCODE_Y] = 0x15,
-    [SDL_SCANCODE_U] = 0x16,
-    [SDL_SCANCODE_I] = 0x17,
-    [SDL_SCANCODE_O] = 0x18,
-    [SDL_SCANCODE_P] = 0x19,
-    [SDL_SCANCODE_LEFTBRACKET] = 0x1A,
-    [SDL_SCANCODE_RIGHTBRACKET] = 0x1B,
-    [SDL_SCANCODE_RETURN] = 0x1C,
-    [SDL_SCANCODE_LCTRL] = 0x1D,
-    [SDL_SCANCODE_A] = 0x1E,
-    [SDL_SCANCODE_S] = 0x1F,
-    [SDL_SCANCODE_D] = 0x20,
-    [SDL_SCANCODE_F] = 0x21,
-    [SDL_SCANCODE_G] = 0x22,
-    [SDL_SCANCODE_H] = 0x23,
-    [SDL_SCANCODE_J] = 0x24,
-    [SDL_SCANCODE_K] = 0x25,
-    [SDL_SCANCODE_L] = 0x26,
-    [SDL_SCANCODE_SEMICOLON] = 0x27,
-    [SDL_SCANCODE_APOSTROPHE] = 0x28,
-    [SDL_SCANCODE_GRAVE] = 0x29,
-    [SDL_SCANCODE_LSHIFT] = 0x2A,
-    [SDL_SCANCODE_BACKSLASH] = 0x2B,
-    [SDL_SCANCODE_Z] = 0x2C,
-    [SDL_SCANCODE_X] = 0x2D,
-    [SDL_SCANCODE_C] = 0x2E,
-    [SDL_SCANCODE_V] = 0x2F,
-    [SDL_SCANCODE_B] = 0x30,
-    [SDL_SCANCODE_N] = 0x31,
-    [SDL_SCANCODE_M] = 0x32,
-    [SDL_SCANCODE_COMMA] = 0x33,
-    [SDL_SCANCODE_PERIOD] = 0x34,
-    [SDL_SCANCODE_SLASH] = 0x35,
-    [SDL_SCANCODE_RSHIFT] = 0x36,
-    [SDL_SCANCODE_KP_MULTIPLY] = 0x37,
-    [SDL_SCANCODE_LALT] = 0x38,
-    [SDL_SCANCODE_SPACE] = 0x39,
-    [SDL_SCANCODE_CAPSLOCK] = 0x3A,
-    [SDL_SCANCODE_F1] = 0x3B,
-    [SDL_SCANCODE_F2] = 0x3C,
-    [SDL_SCANCODE_F3] = 0x3D,
-    [SDL_SCANCODE_F4] = 0x3E,
-    [SDL_SCANCODE_F5] = 0x3F,
-    [SDL_SCANCODE_F6] = 0x40,
-    [SDL_SCANCODE_F7] = 0x41,
-    [SDL_SCANCODE_F8] = 0x42,
-    [SDL_SCANCODE_F9] = 0x43,
-    [SDL_SCANCODE_F10] = 0x44,
-    [SDL_SCANCODE_NUMLOCKCLEAR] = 0x45,
-    [SDL_SCANCODE_SCROLLLOCK] = 0x46,
-    [SDL_SCANCODE_KP_7] = 0x47,
-    [SDL_SCANCODE_KP_8] = 0x48,
-    [SDL_SCANCODE_KP_9] = 0x49,
-    [SDL_SCANCODE_KP_MINUS] = 0x4A,
-    [SDL_SCANCODE_KP_4] = 0x4B,
-    [SDL_SCANCODE_KP_5] = 0x4C,
-    [SDL_SCANCODE_KP_6] = 0x4D,
-    [SDL_SCANCODE_KP_PLUS] = 0x4E,
-    [SDL_SCANCODE_KP_1] = 0x4F,
-    [SDL_SCANCODE_KP_2] = 0x50,
-    [SDL_SCANCODE_KP_3] = 0x51,
-    [SDL_SCANCODE_KP_0] = 0x52,
-    [SDL_SCANCODE_KP_PERIOD] = 0x53,
-    // Add additional mappings here...
-};
-#endif
 
 #endif /* _SDL2_SCANCODE_TO_DINPUT_H_ */

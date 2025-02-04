@@ -37,11 +37,8 @@
 #include "trig.h"
 #include "utility.h"
 #include "world.h"
-#include "brender.h"
 
-#if BASED_FLOAT
-#define BrV1dbBeginWrapper BrV1dbBeginWrapper_Float
-#endif
+#include "brender.h"
 
 int gGame_initialized;
 int gBr_initialized;

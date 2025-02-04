@@ -114,7 +114,7 @@ void InitSkids(void) {
     char mat_name[32];
 #endif
     LOG_TRACE("()");
-    char *saveptr;
+
     for (mat = 0; mat < COUNT_OF(gMaterial_names); mat++) {
         if (gProgram_state.sausage_eater_mode) {
             str = gBoring_material_names[mat];
@@ -130,12 +130,11 @@ void InitSkids(void) {
             }
 
 #if defined(DETHRACE_FIX_BUGS)
-            // Avoid modification of read-only data by strtok_r.
+            // Avoid modification of read-only data by strtok.
             strcpy(mat_name, str);
             str = mat_name;
 #endif
-            sl = strlen(strtok_r(str, ".", &saveptr));
-
+            sl = strlen(strtok(str, "."));
             strcpy(str + sl, ".PIX");
             BrMapAdd(LoadPixelmap(str));
             strcpy(str + sl, ".MAT");

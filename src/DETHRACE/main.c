@@ -1,27 +1,5 @@
 
 #include <stdlib.h>
-#ifdef __DREAMCAST__
-#include <kos.h>
-#include "brender.h"
-void * BR_RESIDENT_ENTRY HostImageLoad(char *name)
-{
-	return NULL;
-}
-
-void BR_RESIDENT_ENTRY HostImageUnload(void *image)
-{
-}
-
-void * BR_RESIDENT_ENTRY HostImageLookupName(void *img, char *name, br_uint_32 hint)
-{
-	return NULL;
-}
-
-void * BR_RESIDENT_ENTRY HostImageLookupOrdinal(void *img, br_uint_32 ordinal)
-{
-	return NULL;
-}
-#endif
 
 #ifdef _WIN32
 #include <io.h>
@@ -38,15 +16,37 @@ void BR_CALLBACK _BrBeginHook(void) {
     struct br_device* BR_EXPORT BrDrv1SoftPrimBegin(char* arguments);
     struct br_device* BR_EXPORT BrDrv1SoftRendBegin(char* arguments);
 
-    BrDevAddStatic(NULL, (br_device_begin_fn *)BrDrv1SoftPrimBegin, NULL);
-    BrDevAddStatic(NULL, (br_device_begin_fn *)BrDrv1SoftRendBegin, NULL);
+    BrDevAddStatic(NULL, BrDrv1SoftPrimBegin, NULL);
+    BrDevAddStatic(NULL, BrDrv1SoftRendBegin, NULL);
     // BrDevAddStatic(NULL, BrDrv1SDL2Begin, NULL);
 }
 
 void BR_CALLBACK _BrEndHook(void) {
 }
 
+
+#ifdef PSP
+#include <pspthreadman.h>
+#define DEFAULT_THREAD_PRIORITY 8
+#define DEFAULT_THREAD_ATTRIBUTE 0
+#define DEFAULT_THREAD_STACK_KB_SIZE 512
+int dethrace_main(unsigned int argc, void* argv);
 int main(int argc, char* argv[]) {
+	// We need a bigger stack to run dethrace, so we create a new thread with a proper stack size
+    //	sceKernelCreateThread (const char *name, SceKernelThreadEntry entry, int initPriority, int stackSize, SceUInt attr, SceKernelThreadOptParam *option)
+	SceUID main_thread = sceKernelCreateThread("dethrace", dethrace_main, DEFAULT_THREAD_PRIORITY, DEFAULT_THREAD_STACK_KB_SIZE * 1024, DEFAULT_THREAD_ATTRIBUTE | PSP_THREAD_ATTR_USER | PSP_THREAD_ATTR_CLEAR_STACK, 0);
+	if (main_thread >= 0){
+		sceKernelStartThread(main_thread, 0, NULL);
+	}
+	return sceKernelExitDeleteThread(0);
+}
+int dethrace_main(unsigned int vita_argc, void *vita_argv) {
+	int argc = 0;
+	char *argv[1];
+	argv[0] = "";
+#else
+int main(int argc, char* argv[]) {
+#endif
 #ifdef _WIN32
     /* Attach to the console that started us if any */
     if (AttachConsole(ATTACH_PARENT_PROCESS)) {
@@ -64,9 +64,7 @@ int main(int argc, char* argv[]) {
         }
     }
 #endif
-// #ifdef __DREAMCAST__
-//     fs_chdir("/cd/dethrace");
-// #endif    
+
     Harness_Init(&argc, argv);
 
     return original_main(argc, argv);

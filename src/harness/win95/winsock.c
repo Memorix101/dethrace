@@ -1,9 +1,5 @@
 #include "harness/winsock.h"
 
-#ifndef FIONBIO
-#define FIONBIO 0x2000  // or some other appropriate value
-#endif
-
 #ifndef _WIN32
 
 int WSAStartup(int version, WSADATA* data) {
@@ -21,7 +17,9 @@ int WSACleanup(void) {
 
 // Only implement non-blocking call for now
 int ioctlsocket(int handle, long cmd, unsigned long* argp) {
+#ifndef __PSP__
     assert(cmd == FIONBIO);
+#endif
 
     int flags = fcntl(handle, F_GETFL);
     flags |= O_NONBLOCK;

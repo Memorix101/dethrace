@@ -6,71 +6,24 @@
 #include <assert.h>
 #include <ctype.h>
 #include <dirent.h>
-#ifndef __DREAMCAST__
 #include <err.h>
-#include <execinfo.h>
-#include <link.h>
-#include <libgen.h>
-#include <termios.h>
-#endif
-
 #include <errno.h>
-
+#include <execinfo.h>
 #include <fcntl.h>
-
+#include <libgen.h>
 #include <limits.h>
-
+#include <link.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>      
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
-
-#ifdef __DREAMCAST__
-// A stub of termios structure for Dreamcast (no termios.h)
-typedef unsigned int tcflag_t;
-typedef unsigned char cc_t;
-
-#define NCCS 32  // Number of control characters (default)
-
-struct termios {
-    tcflag_t c_iflag;       // Input modes (flags)
-    tcflag_t c_oflag;       // Output modes (flags)
-    tcflag_t c_cflag;       // Control modes (flags)
-    tcflag_t c_lflag;       // Local modes (flags)
-    cc_t c_cc[NCCS];        // Control characters (e.g., interrupt, erase, etc.)
-};
-
-char* my_dirname(const char* path) {
-    const char* lastSlash = strrchr(path, '/');
-    const char* lastBackslash = strrchr(path, '\\');
-    const char* lastSeparator = (lastSlash > lastBackslash) ? lastSlash : lastBackslash;
-
-    if (lastSeparator == NULL) {
-        char* result = malloc(2);
-        if (result != NULL) {
-            result[0] = '.';
-            result[1] = '\0';
-        }
-        return result;  // If no '/' or '\' found, return current directory
-}
-
-    size_t dirLen = lastSeparator - path;
-    char* dir = malloc(dirLen + 1);
-    if (dir != NULL) {
-        memcpy(dir, path, dirLen);
-        dir[dirLen] = '\0';
-    }
-    return dir;
-}
-#endif
-
 
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof(A[0]))
 #define MAX_STACK_FRAMES 64
@@ -89,22 +42,17 @@ struct dl_iterate_callback_data {
 
 static int dl_iterate_callback(struct dl_phdr_info* info, size_t size, void* data) {
     struct dl_iterate_callback_data* callback_data = data;
-#ifndef __DREAMCAST__
+
     if (strcmp(info->dlpi_name, "") == 0) {
         callback_data->start = info->dlpi_addr;
     }
-#endif    
     return 0;
 }
 
 static intptr_t get_dethrace_offset(void) {
     if (!dethrace_dl_data.initialized) {
         dethrace_dl_data.initialized = 1;
-#ifndef __DREAMCAST__
-        dl_iterate_phdr(dl_iterate_callback, (size_t)&dethrace_dl_data);
-#else
-        return 0;
-#endif        
+        dl_iterate_phdr(dl_iterate_callback, &dethrace_dl_data);
     }
     return dethrace_dl_data.start;
 }
@@ -125,9 +73,9 @@ static void print_stack_trace(void) {
     char** messages = (char**)NULL;
 
     fputs("\nStack trace:\n", stderr);
-#ifndef __DREAMCAST__
+
     trace_size = backtrace(stack_traces, MAX_STACK_FRAMES);
-    messages = (char**)backtrace_symbols(stack_traces, trace_size);
+    messages = backtrace_symbols(stack_traces, trace_size);
 
     /* skip the first couple stack frames (as they are this function and
      our handler) and also skip the last frame as it's (always?) junk. */
@@ -136,7 +84,6 @@ static void print_stack_trace(void) {
             printf("  error determining line # for: %s\n", messages[i]);
         }
     }
-#endif    
     if (messages) {
         free(messages);
     }
@@ -145,7 +92,7 @@ static void print_stack_trace(void) {
 static void signal_handler(int sig, siginfo_t* siginfo, void* context) {
     (void)context;
     fputs("\n******************\n", stderr);
-#ifndef __DREAMCAST__
+
     switch (sig) {
     case SIGSEGV:
         fputs("Caught SIGSEGV\n", stderr);
@@ -224,7 +171,6 @@ static void signal_handler(int sig, siginfo_t* siginfo, void* context) {
     default:
         break;
     }
-#endif
     fputs("******************\n", stderr);
     print_stack_trace();
     exit(1);
@@ -245,7 +191,7 @@ void resolve_full_path(char* path, const char* argv0) {
 
 void OS_InstallSignalHandler(char* program_name) {
     resolve_full_path(_program_name, program_name);
-#ifndef __DREAMCAST__
+
     /* setup alternate stack */
     {
         stack_t ss = {};
@@ -288,7 +234,6 @@ void OS_InstallSignalHandler(char* program_name) {
             err(1, "sigaction");
         }
     }
-#endif    
 }
 
 FILE* OS_fopen(const char* pathname, const char* mode) {
@@ -300,11 +245,7 @@ FILE* OS_fopen(const char* pathname, const char* mode) {
     char buffer2[512];
     strcpy(buffer, pathname);
     strcpy(buffer2, pathname);
-    #ifndef __DREAMCAST__
-    char* pDirName = (char *)dirname(buffer);
-    #else
-    char* pDirName = (char *)my_dirname(buffer);
-    #endif
+    char* pDirName = dirname(buffer);
     char* pBaseName = basename(buffer2);
     DIR* pDir = opendir(pDirName);
     if (pDir == NULL) {
@@ -319,11 +260,6 @@ FILE* OS_fopen(const char* pathname, const char* mode) {
         }
     }
     closedir(pDir);
-
-#ifdef __DREAMCAST__
-        free(pDirName);
-#endif
-
     if (harness_game_config.verbose) {
         if (f == NULL) {
             fprintf(stderr, "Failed to open \"%s\" (%s)\n", pathname, strerror(errno));
@@ -335,8 +271,8 @@ FILE* OS_fopen(const char* pathname, const char* mode) {
 size_t OS_ConsoleReadPassword(char* pBuffer, size_t pBufferLen) {
     struct termios old, new;
     char c;
-    size_t len=0;
-#ifndef __DREAMCAST__
+    size_t len;
+
     tcgetattr(STDIN_FILENO, &old);
     new = old;
     new.c_lflag &= ~(ICANON | ECHO);
@@ -371,17 +307,12 @@ size_t OS_ConsoleReadPassword(char* pBuffer, size_t pBufferLen) {
     }
 
     tcsetattr(STDIN_FILENO, TCSANOW, &old);
-#endif    
     return len;
 }
 
 char* OS_Dirname(const char* path) {
     strcpy(name_buf, path);
-#ifndef __DREAMCAST__    
-    return (char*)dirname(name_buf);
-#else
-    return (char*)my_dirname(name_buf);
-#endif
+    return dirname(name_buf);
 }
 
 char* OS_Basename(const char* path) {
