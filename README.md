@@ -14,7 +14,7 @@ Dethrace is an attempt to learn how the 1997 driving/mayhem game [Carmageddon](h
 - Latest screenshot:
 
 
-https://github.com/user-attachments/assets/fb7441d2-3aaa-4e5c-8313-7df84d736156
+https://github.com/user-attachments/assets/f80d13fd-51f9-495d-9aa9-b7b5ff6a7f42
 
 
 ## Background
