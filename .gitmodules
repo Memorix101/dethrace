@@ -1,4 +1,4 @@
 [submodule "lib/BRender-v1.3.2"]
 	path = lib/BRender-v1.3.2
-	url = https://github.com/dethrace-labs/BRender-v1.3.2.git
-	branch = glrenderer
+	url = https://github.com/Memorix101/BRender-v1.3.2.git
+	branch = 3dfx
