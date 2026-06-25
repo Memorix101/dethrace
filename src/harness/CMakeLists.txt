@@ -55,26 +55,15 @@ target_sources(harness PRIVATE
 
     platforms/null.c
     platforms/null.h
-    vmu_profiler.c
 
     "${CMAKE_CURRENT_BINARY_DIR}/version.h"
 )
 
-<<<<<<< HEAD
 if(DETHRACE_SOUND_ENABLED)
     target_sources(harness PRIVATE audio/miniaudio.c audio/stb_vorbis_impl.c)
     target_link_libraries(harness PRIVATE miniaudio stb)
 else()
     target_sources(harness PRIVATE audio/null.c)
-=======
-if (IO_PLATFORM STREQUAL "SDL2")
-    target_sources(harness PRIVATE
-        platforms/sdl2.c
-        #platforms/dc_pvr.c
-        platforms/sdl2_scancode_to_dinput.h
-    )
-    target_link_libraries(harness PRIVATE SDL2::SDL2)
->>>>>>> origin/pvr
 endif()
 
 if(MSVC_42_FOR_RECCMP)

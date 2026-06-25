@@ -3,7 +3,6 @@
 /tools/mkdcdisc
 .DS_Store
 .vscode
-<<<<<<< HEAD
 reccmp-user.yml
 reccmp-build.yml
 reccmp-report*
@@ -11,7 +10,3 @@ reccmp-report*
 tools/carmdemo/
 
 tools/carmdemox/
-=======
-*.Identifier
-/src/DETHRACE/CMakeFiles
->>>>>>> origin/pvr

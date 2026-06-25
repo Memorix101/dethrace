@@ -38,16 +38,10 @@
 #include "trig.h"
 #include "utility.h"
 #include "world.h"
+
 #include "brender.h"
 
-<<<<<<< HEAD
 // GLOBAL: CARM95 0x0052115c
-=======
-#if BASED_FLOAT
-#define BrV1dbBeginWrapper BrV1dbBeginWrapper_Float
-#endif
-
->>>>>>> origin/pvr
 int gGame_initialized;
 
 // GLOBAL: CARM95 0x00521160

@@ -1265,12 +1265,7 @@ char* S3GetCurrentDir(void) {
 tS3_descriptor* S3GetDescriptorByID(tS3_sound_tag id) {
     tS3_descriptor* d; // [esp+Ch] [ebp-4h]
 
-      // Clamp invalid IDs to 1
-    /*if (id < 1) {
-        id = 1;
-    }*/
-
-    assert(id != 0); //DANGER
+    assert(id != 0);
 
     for (d = gS3_descriptors;; d = d->next) {
         if (!d) {

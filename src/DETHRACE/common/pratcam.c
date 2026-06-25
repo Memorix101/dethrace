@@ -148,12 +148,7 @@ void LoadPratcam(char* pFolder_name) {
     char folder_path[256];
     char* str;
     char num_str[256];
-<<<<<<< HEAD
 
-=======
-    LOG_TRACE("(\"%s\")", pFolder_name);
-    char *saveptr;
->>>>>>> origin/pvr
     if (gAusterity_mode) {
         return;
     }
@@ -166,11 +161,7 @@ void LoadPratcam(char* pFolder_name) {
         FatalError(kFatalError_OpenPratCamTextFile);
     }
     GetALineAndDontArgue(f, s);
-<<<<<<< HEAD
     str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
-=======
-    str = strtok_r(s, "\t ,/", &saveptr);
->>>>>>> origin/pvr
     sscanf(str, "%d", &gNumber_of_prat_flics);
     gPratcam_flics = BrMemAllocate(gNumber_of_prat_flics * sizeof(tPrat_flic_spec), kMem_pratcam_flic_array);
     for (i = 0; i < gNumber_of_prat_flics; i++) {
@@ -179,11 +170,7 @@ void LoadPratcam(char* pFolder_name) {
         if (strcmp(s, "END") == 0) {
             FatalError(kFatalError_TooFewFlicSpecsInPratCamFile);
         }
-<<<<<<< HEAD
         str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
-=======
-        str = strtok_r(s, "\t ,/", &saveptr);
->>>>>>> origin/pvr
         PathCat(the_path, folder_path, str);
         g = DRfopen(the_path, "rb");
         if (g == NULL) {
@@ -202,11 +189,7 @@ void LoadPratcam(char* pFolder_name) {
         FatalError(kFatalError_TooManyFlicSpecsInPratCamTextFIle);
     }
     GetALineAndDontArgue(f, s);
-<<<<<<< HEAD
     str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
-=======
-    str = strtok_r(s, "\t ,/", &saveptr);
->>>>>>> origin/pvr
     sscanf(str, "%d", &gNumber_of_prat_sequences);
     gPratcam_sequences = BrMemAllocate(gNumber_of_prat_sequences * sizeof(tPrat_sequence), kMem_pratcam_sequence_array);
     for (i = 0; i < gNumber_of_prat_sequences; i++) {
@@ -216,11 +199,7 @@ void LoadPratcam(char* pFolder_name) {
         if (strcmp(s, "END") == 0) {
             FatalError(kFatalError_TooFewSequencesInPratCamTextFile);
         }
-<<<<<<< HEAD
         str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
-=======
-        str = strtok_r(s, "\t ,/", &saveptr);
->>>>>>> origin/pvr
         sscanf(str, "%d", &gPratcam_sequences[i].precedence);
         gPratcam_sequences[i].repeat_chunk = GetAnInt(f);
         gPratcam_sequences[i].number_of_chunks = GetAnInt(f);
@@ -229,18 +208,13 @@ void LoadPratcam(char* pFolder_name) {
         }
         for (j = 0; j < gPratcam_sequences[i].number_of_chunks; j++) {
             GetALineAndDontArgue(f, s);
-<<<<<<< HEAD
             str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
-=======
-            str = strtok_r(s, "\t ,/", &saveptr);
->>>>>>> origin/pvr
             sscanf(str, "%d", &gPratcam_sequences[i].chunks[j].number_of_alternatives);
             if (gPratcam_sequences[i].chunks[j].number_of_alternatives > COUNT_OF(gPratcam_sequences[i].chunks[j].alternatives)) {
                 FatalError(kFatalError_PratCamSequenceTooManyAlternatives_S, num_str);
             }
             for (k = 0; k < gPratcam_sequences[i].chunks[j].number_of_alternatives; k++) {
                 GetALineAndDontArgue(f, s);
-<<<<<<< HEAD
                 str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
                 sscanf(str, "%d", &gPratcam_sequences[i].chunks[j].alternatives[k].ref);
                 str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
@@ -249,26 +223,12 @@ void LoadPratcam(char* pFolder_name) {
                 sscanf(str, "%d", &gPratcam_sequences[i].chunks[j].alternatives[k].sound_chance);
                 if (gPratcam_sequences[i].chunks[j].alternatives[k].sound_chance > 0) {
                     str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
-=======
-                str = strtok_r(s, "\t ,/", &saveptr);
-                sscanf(str, "%d", &gPratcam_sequences[i].chunks[j].alternatives[k].ref);
-                str = strtok_r(0, "\t ,/", &saveptr);
-                sscanf(str, "%d", &gPratcam_sequences[i].chunks[j].alternatives[k].chance);
-                str = strtok_r(0, "\t ,/", &saveptr);
-                sscanf(str, "%d", &gPratcam_sequences[i].chunks[j].alternatives[k].sound_chance);
-                if (gPratcam_sequences[i].chunks[j].alternatives[k].sound_chance > 0) {
-                    str = strtok_r(0, "\t ,/", &saveptr);
->>>>>>> origin/pvr
                     sscanf(str, "%d", &gPratcam_sequences[i].chunks[j].alternatives[k].number_of_sounds);
                     if (gPratcam_sequences[i].chunks[j].alternatives[k].number_of_sounds > COUNT_OF(gPratcam_sequences[i].chunks[j].alternatives[k].sound_ids)) {
                         FatalError(kFatalError_PratCamSequenceTooManySounds_S, num_str);
                     }
                     for (l = 0; l < gPratcam_sequences[i].chunks[j].alternatives[k].number_of_sounds; l++) {
-<<<<<<< HEAD
                         str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
-=======
-                        str = strtok_r(0, "\t ,/", &saveptr);
->>>>>>> origin/pvr
                         sscanf(str, "%d", &gPratcam_sequences[i].chunks[j].alternatives[k].sound_ids[l]);
                         DRS3LoadSound(gPratcam_sequences[i].chunks[j].alternatives[k].sound_ids[l]);
                     }

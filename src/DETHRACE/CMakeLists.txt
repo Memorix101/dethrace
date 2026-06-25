@@ -15,15 +15,7 @@ if(DETHRACE_ASAN)
     target_link_options(dethrace_obj PUBLIC -fsanitize=address)
 endif()
 
-<<<<<<< HEAD
 target_link_libraries(dethrace_obj PUBLIC smackw32 harness BRender::Full BRender::DDI s3)
-=======
-target_link_libraries(dethrace_obj PUBLIC SDL2::SDL2 smackw32 harness BRender::Full BRender::DDI s3)
-target_link_libraries(dethrace_obj PUBLIC /opt/toolchains/dc/kos-ports/lib/libtremor.a)
-target_link_libraries(dethrace_obj PUBLIC /opt/toolchains/dc/kos-ports/lib/libADX.a)
-target_link_libraries(dethrace_obj PUBLIC /opt/toolchains/dc/kos-ports/lib/libwav.a)
-target_link_libraries(dethrace_obj PUBLIC /opt/toolchains/dc/kos-ports/lib/libfastmem.a)
->>>>>>> origin/pvr
 
 if(MSVC_42_FOR_RECCMP)
 # do nothing
@@ -44,8 +36,6 @@ else()
         -Wno-unused-result
         -Wno-absolute-value
         -Wstrict-prototypes
-        -Wimplicit-function-declaration
-        -Wint-conversion
     )
 endif()
 
@@ -69,50 +59,9 @@ if(DETHRACE_REPLAY_DEBUG)
     target_compile_definitions(dethrace_obj PRIVATE DETHRACE_REPLAY_DEBUG)
 endif()
 
-<<<<<<< HEAD
 if(MINGW)
     target_compile_options(dethrace_obj PRIVATE -Wno-error=incompatible-pointer-types)
 endif()
-=======
-set(COMMON_COMPILE_FLAGS
-    -O3
-
-    #-fno-math-errno
-        #-fno-signed-zeros
-    #-fno-trapping-math
-    #-fassociative-math
-    #-freciprocal-math
-        #-funsafe-math-optimizations
-        #-ffinite-math-only
-    #-fno-rounding-math
-    #-fcx-limited-range
-    #-fno-signaling-nans
-    #-fexcess-precision=fast
-
-    #-fno-lto 
-    -fbuiltin 
-    -flto=auto
-    -ffast-math 
-    #-mfsca 
-    #-mfsrra
-    -ffp-contract=fast
-)
-target_compile_options(dethrace_obj PRIVATE ${COMMON_COMPILE_FLAGS})
-
-set(OPTIMIZED_FILES 
-    common/car.c 
-    common/controls.c 
-    common/crush.c 
-    common/displays.c 
-    #common/netgame.c 
-    common/utility.c
-)
-
-set_source_files_properties(
-    ${OPTIMIZED_FILES}
-    PROPERTIES COMPILE_FLAGS "-fno-builtin -fno-lto -fno-fast-math"
-)
->>>>>>> origin/pvr
 
 target_sources(dethrace_obj PRIVATE
     common/skidmark.c

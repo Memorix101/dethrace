@@ -6,41 +6,7 @@
 
 Dethrace is an attempt to learn how the 1997 driving/mayhem game [Carmageddon](https://en.wikipedia.org/wiki/Carmageddon) works behind the scenes and rebuild it to run natively on modern systems.
 
-<<<<<<< HEAD
 ## Status
-=======
-## Progress
-(Follow us on Discord or Twitter to get notified of updates!)
-
-#### Last updated June 17 2024
-- 92% of functions implemented
-- Latest screenshot:
-
-https://github.com/user-attachments/assets/3cc2f003-b69d-4d0c-9609-09fc442c7482
-
-## Background
-Watcom debug symbols for an earlier internal build [were discovered](http://1amstudios.com/2014/12/02/carma1-symbols-dumped) named `DETHRSC.SYM` on the [Carmageddon Splat Pack](http://carmageddon.wikia.com/wiki/Carmageddon_Splat_Pack) expansion CD release. The symbols unfortunately did not match any known released executable, meaning they were interesting but not immediately usable to reverse engineer the game.
-
-This is what it looked like from the Watcom debugger - the names of all the methods were present but the code location they were pointing to was junk:
-
-![watcom-debugger](http://1amstudios.com/img/watcom-debugger.jpg)
-
-_CrayzKirk_ from the Carmageddon community picked it up and did a lot of painstaking work manually matching up many functions and data structures in the DOS executable to the debugging symbols.
-
-We are slowly replacing the original assembly code with equivalent C code, function by function.
-
-### Is "dethrace" a typo?
-No, well, I don't think so at least. The original files according to the symbol dump were stored in `c:\DETHRACE`, and the symbol file is called `DETHSRC.SYM`. Maybe they removed the "a" to be compatible with [8.3 filenames](https://en.wikipedia.org/wiki/8.3_filename)?
-
-## Game content
-
-Dethrace does not ship with any content. You'll need access to the data from the original game. If you don't have an original CD then you can [buy Carmageddon from GoG.com](https://www.gog.com/game/carmageddon_max_pack).
-
-`dethrace` also supports the various freeware demos:
-- [Original Carmageddon demo](https://rr2000.cwaboard.co.uk/R4/PC/carmdemo.zip)
-- [Splat Pack demo](https://rr2000.cwaboard.co.uk/R4/PC/splatdem.zip)
-- [Splat Pack Xmas demo](https://rr2000.cwaboard.co.uk/R4/PC/Splatpack_christmas_demo.zip)
->>>>>>> origin/pvr
 
 <img width="50%" src="https://raw.githubusercontent.com/dethrace-labs/reccmp-report/refs/heads/main/progress.svg">
 
@@ -67,7 +33,7 @@ apt-get install libsdl2-dev cmake
 Dethrace uses [git submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodules), so we must pull them after the inital clone:
 
 ```sh
-git clone https://github.com/Memorix101/dethrace-dc
+git clone https://github.com/dethrace-labs/dethrace
 cd dethrace
 git submodule update --init --recursive
 ```
@@ -146,17 +112,3 @@ Dethrace is released to the Public Domain. The documentation and function provid
 The source code in this repository is for non-commerical use only. If you use the source code you may not charge others for access to it or any derivative work thereof.
 
 Dethrace and any of its' maintainers are in no way associated with or endorsed by SCi, Stainless Software or THQ Nordic.
-
-#### DREAMCAST build, requires dreamcast SDL2 from https://github.com/GPF/SDL2, KOS built with `make -j8 CFLAGS+=" -DTHD_KERNEL_STACK_SIZE=128000 -DTHD_STACK_SIZE=128000" all` (use gpf-environ.sh included to build dethrace)
-```bash
-cmake   -DCMAKE_TOOLCHAIN_FILE="$KOS_CMAKE_TOOLCHAIN" -D__DREAMCAST__=1 -DSDL2_DIR="/opt/toolchains/dc/kos/addons/lib/dreamcast/cmake/SDL2"   -DSDL2_INCLUDE_DIRS="/opt/toolchains/dc/kos/addons/include/SDL2"   -DSDL2_LIBRARIES="/opt/toolchains/dc/kos/addons/lib/dreamcast/libSDL2.a;/opt/toolchains/dc/kos/addons/lib/dreamcast/libSDL2main.a"   -Bbuild
-```
-
-rebuild kos with bigger stack size
-```bash
-make -j$(nprocs) CFLAGS+=" -DTHD_KERNEL_STACK_SIZE=128000 -DTHD_STACK_SIZE=128000" all
-```
-
-https://github.com/user-attachments/assets/8d8f664d-293e-4c1c-be33-e7077d0c19c1
-
-

@@ -1,25 +1,13 @@
 #include <SDL.h>
 
 #include "harness.h"
-#include "memf.h"
 #include "harness/config.h"
 #include "harness/hooks.h"
 #include "harness/trace.h"
-<<<<<<< HEAD
 #include "sdl2_scancode_map.h"
 #include "sdl2_syms.h"
 
 SDL_COMPILE_TIME_ASSERT(sdl2_platform_requires_SDL2, SDL_MAJOR_VERSION == 2);
-=======
-#include "sdl2_scancode_to_dinput.h"
-#include "sdl2_gamepad_to_dinput.h"
-SDL_Window* window;
-SDL_Renderer* renderer;
-SDL_Texture* screen_texture;
-uint32_t converted_palette[256];
-br_pixelmap* last_screen_src;
-int render_width, render_height;
->>>>>>> origin/pvr
 
 static SDL_Window* window;
 static SDL_Renderer* renderer;
@@ -27,7 +15,6 @@ static SDL_Texture* screen_texture;
 static br_uint_32 converted_palette[256];
 static br_pixelmap* last_screen_src;
 
-<<<<<<< HEAD
 static SDL_GLContext* gl_context;
 
 static int render_width, render_height;
@@ -35,123 +22,10 @@ static int render_width, render_height;
 static Uint32 last_frame_time;
 
 static void (*gKeyHandler_func)(void);
-=======
-uint8_t directinput_key_state[SDL_NUM_SCANCODES];
-#include <kos.h>
-#include <stdatomic.h>
-#include "../vmu_profiler.h"
-#include <stdio.h>
-#include <stdint.h>
-#include <kos/init.h>
-#include <arch/arch.h>
-
-
-
-//extern size_t xform_verts;
-void update_transformed_verts(vmu_profiler_measurement_t *m)
-{
-	//m->ustorage = (size_t)xform_verts;
-}
-
-void fps_callback(vmu_profiler_measurement_t *m) {
-    pvr_stats_t stats;
-    pvr_get_stats(&stats);
-    m->fstorage = stats.frame_rate;  
-}
-
-void mem_callback(vmu_profiler_measurement_t *m) {
-    void* base = (void*)(uintptr_t)page_phys_base; // Cast required
-    void* top = (void*)(uintptr_t)_arch_mem_top;   // Cast required
-    void* current = sbrk(0);      // Current break (end of allocated heap)
-
-    uint32_t total_memory = (uintptr_t)top - (uintptr_t)base;
-    uint32_t used_memory = (uintptr_t)current - (uintptr_t)base;
-    uint32_t free_memory = total_memory - used_memory;
-
-    // Convert to megabytes
-    float total_memory_mb = total_memory / (1024.0f * 1024.0f);
-    float used_memory_mb = used_memory / (1024.0f * 1024.0f);
-    float free_memory_mb = free_memory / (1024.0f * 1024.0f);
-
-    m->fstorage = used_memory_mb;
-}
-
-#include <kos.h>
-#include <stdio.h>
-
-void cpu_usage_callback(vmu_profiler_measurement_t *m) {
-   static uint64_t last_active_time = 0;
-    static uint64_t last_real_time = 0;
-
-    // Get current active CPU time in nanoseconds
-    uint64_t current_active_time = perf_cntr_timer_ns();
-
-    // Get current real-world time in milliseconds
-    uint64_t current_real_time = timer_ms_gettime64();
-
-    if (last_real_time == 0) {
-        // Initialize the last times during the first call
-        last_active_time = current_active_time;
-        last_real_time = current_real_time;
-        return;
-    }
-
-    // Calculate elapsed times
-    uint64_t active_time_elapsed = current_active_time - last_active_time;
-    uint64_t real_time_elapsed = (current_real_time - last_real_time) * 1000000; // Convert ms to ns
-
-    // Calculate CPU usage as a percentage
-    float cpu_usage = ((float)active_time_elapsed / (float)real_time_elapsed) * 100.0f;
-
-    // Display the CPU usage
-    //printf("CPU Usage: %.2f%%\n", cpu_usage);
-
-    // Update the last times
-    last_active_time = current_active_time;
-    last_real_time = current_real_time;
-
-    // Store the result in the profiler
-    m->fstorage = cpu_usage;
-}
-
-
-void setup_measures(struct vmu_profiler *p) {
-    vmu_profiler_measurement_t *fps_msr = init_measurement("FPS", use_float, fps_callback);
-	vmu_profiler_measurement_t *cpu_msr = init_measurement("SH4", use_float, cpu_usage_callback);
-	vmu_profiler_measurement_t *mem_msr = init_measurement("MEM", use_float, mem_callback);
-    vmu_profiler_add_measure(p, fps_msr);
-    vmu_profiler_add_measure(p, cpu_msr);
-	vmu_profiler_add_measure(p, mem_msr);
-}
-
-static void* create_window_and_renderer(char* title, int x, int y, int width, int height) {
-    // gdb_init();
-    //dbgio_dev_select("fb");
-    //SDL_setenv("SDL_AUDIODRIVER", "dummy", 1);
-    render_width = width;
-    render_height = height;
-    //SDL_SetHint(SDL_HINT_DC_VIDEO_MODE, "SDL_DC_TEXTURED_VIDEO");
-    //SDL_SetHint(SDL_HINT_DC_VIDEO_MODE, "SDL_DC_DIRECT_VIDEO"); 
-    SDL_SetHint(SDL_HINT_VIDEO_DOUBLE_BUFFER, "0");
-    if (SDL_Init(SDL_INIT_VIDEO| SDL_INIT_AUDIO | SDL_INIT_JOYSTICK| SDL_INIT_GAMECONTROLLER) != 0) {
-        LOG_PANIC("SDL_INIT_VIDEO error: %s", SDL_GetError());
-    }
-
-    // if(SDL_InitSubSystem(SDL_INIT_GAMECONTROLLER) != 0) {
-    //     LOG_WARN("SDL_INIT_GAMECONTROLLER error: %s", SDL_GetError());
-    // }
-
-    window = SDL_CreateWindow(title,
-        SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED,
-        width, height,
-        SDL_WINDOW_FULLSCREEN_DESKTOP);
->>>>>>> origin/pvr
 
 // 32 bytes, 1 bit per key. Matches dos executable behavior
 static br_uint_32 key_state[8];
 
-<<<<<<< HEAD
 static struct {
     int x, y;
     float scale_x, scale_y;
@@ -226,33 +100,8 @@ static void calculate_viewport(int window_width, int window_height) {
             vp_width = window_height * target_aspect_ratio + .5f;
         } else {
             vp_height = window_width / target_aspect_ratio + .5f;
-=======
-    if (harness_game_config.start_full_screen) {
-        SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
-    }
-    
-    //SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
-    SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
-    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED); //SDL_RENDERER_PRESENTVSYNC
-    if (renderer == NULL) {
-        LOG_PANIC("Failed to create renderer: %s", SDL_GetError());
-    }
-    //printf("HERE\n");
-    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-    //printf("HERE2\n");
-    SDL_RenderSetLogicalSize(renderer, render_width, render_height);
-    printf("Video res: width %d. height %d\n ", width, height);
-    screen_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, width, height); // 320x200
-    //printf("HERE4\n");
-    if (screen_texture == NULL) {
-        SDL_RendererInfo info;
-        SDL_GetRendererInfo(renderer, &info);
-        for (Uint32 i = 0; i < info.num_texture_formats; i++) {
-            LOG_INFO("%s\n", SDL_GetPixelFormatName(info.texture_formats[i]));
->>>>>>> origin/pvr
         }
     }
-<<<<<<< HEAD
     viewport.x = (window_width - vp_width) / 2;
     viewport.y = (window_height - vp_height) / 2;
     viewport.scale_x = (float)vp_width / gBack_screen->width;
@@ -260,28 +109,12 @@ static void calculate_viewport(int window_width, int window_height) {
 }
 
 static int SDL2_Harness_SetWindowPos(void* hWnd, int x, int y, int nWidth, int nHeight) {
-=======
-
-    printf("Profiler init\n");
-    vmu_profiler_start(0, setup_measures);
-
-    return window;
-}
-
-static int set_window_pos(void* hWnd, int x, int y, int nWidth, int nHeight) {
-// #ifndef __DREAMCAST__    
->>>>>>> origin/pvr
     // SDL_SetWindowPosition(hWnd, x, y);
     if (nWidth == 320 && nHeight == 200) {
         nWidth = 640;
         nHeight = 400;
     }
-<<<<<<< HEAD
     SDL2_SetWindowSize(hWnd, nWidth, nHeight);
-=======
-    SDL_SetWindowSize(hWnd, nWidth, nHeight);
-// #endif    
->>>>>>> origin/pvr
     return 0;
 }
 
@@ -303,7 +136,6 @@ static int is_only_key_modifier(int modifier_flags, int flag_check) {
 static void SDL2_Harness_ProcessWindowMessages(void) {
     SDL_Event event;
 
-<<<<<<< HEAD
     while (SDL2_PollEvent(&event)) {
         switch (event.type) {
         case SDL_KEYDOWN:
@@ -320,57 +152,10 @@ static void SDL2_Harness_ProcessWindowMessages(void) {
                 } else if (event.key.type == SDL_KEYUP) {
                     if (is_only_key_modifier(event.key.keysym.mod, KMOD_ALT)) {
                         SDL2_SetWindowFullscreen(window, (SDL2_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP) ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP);
-=======
-     while (SDL_PollEvent(&event)) {
-        switch (event.type) {
-            case SDL_KEYDOWN:
-            case SDL_KEYUP:
-                dinput_key = sdlScanCodeToDirectInputKeyNum[event.key.keysym.scancode];
-                if (dinput_key != 0) {
-                    directinput_key_state[dinput_key] = (event.type == SDL_KEYDOWN ? 0x80 : 0);
-                }
-                break;
-
-            case SDL_CONTROLLERDEVICEADDED:
-                SDL_GameControllerOpen(event.cdevice.which);
-                break;
-
-            case SDL_CONTROLLERBUTTONDOWN:
-            case SDL_CONTROLLERBUTTONUP:
-                dinput_key = sdlGamepadToDirectInputKeyNum.buttonMapping[event.cbutton.button];
-                if (dinput_key != 0) {
-                    directinput_key_state[dinput_key] = (event.type == SDL_CONTROLLERBUTTONDOWN ? 0x80 : 0);
-                }
-                break;
-
-            case SDL_CONTROLLERAXISMOTION:
-                if (event.caxis.value > 16000) {  // Axis positive
-                    dinput_key = sdlGamepadToDirectInputKeyNum.axisPositive[event.caxis.axis];
-                    if (dinput_key != 0) {
-                        directinput_key_state[dinput_key] = 0x80;
-                    }
-                } else if (event.caxis.value < -16000) {  // Axis negative
-                    dinput_key = sdlGamepadToDirectInputKeyNum.axisNegative[event.caxis.axis];
-                    if (dinput_key != 0) {
-                        directinput_key_state[dinput_key] = 0x80;
-                    }
-                } else {  // Reset when neutral
-                    directinput_key_state[sdlGamepadToDirectInputKeyNum.axisPositive[event.caxis.axis]] = 0x00;
-                    directinput_key_state[sdlGamepadToDirectInputKeyNum.axisNegative[event.caxis.axis]] = 0x00;
-                }
-                break;
-
-            case SDL_WINDOWEVENT:
-                if (event.window.event == SDL_WINDOWEVENT_CLOSE) {
-                    if (SDL_GetWindowID(window) == event.window.windowID) {
-                        msg->message = WM_QUIT;
-                        return 1;
->>>>>>> origin/pvr
                     }
                 }
-                break;
+            }
 
-<<<<<<< HEAD
             // Map incoming SDL scancode to PC scan code as used by game code
             if (sdl_scancode_map[event.key.keysym.scancode] == 0) {
                 LOG_WARN3("unexpected scan code %s (%d)", SDL2_GetScancodeName(event.key.keysym.scancode), event.key.keysym.scancode);
@@ -396,11 +181,6 @@ static void SDL2_Harness_ProcessWindowMessages(void) {
 
         case SDL_QUIT:
             QuitGame();
-=======
-            case SDL_QUIT:
-                msg->message = WM_QUIT;
-                return 1;
->>>>>>> origin/pvr
         }
     }
 }
@@ -577,14 +357,6 @@ static void SDL2_Harness_CreateWindow(const char* title, int width, int height, 
         window_width = 640;
         window_height = 480;
     }
-<<<<<<< HEAD
-=======
-    SDL_UnlockTexture(screen_texture);
-    SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, screen_texture, NULL, NULL);
-    //SDL_RenderCopyEx(renderer, screen_texture, NULL, NULL, 0, NULL, SDL_FLIP_VERTICAL | SDL_FLIP_HORIZONTAL);
-    SDL_RenderPresent(renderer);
->>>>>>> origin/pvr
 
     if (SDL2_Init(SDL_INIT_VIDEO) != 0) {
         LOG_PANIC2("SDL_INIT_VIDEO error: %s", SDL2_GetError());
@@ -695,24 +467,15 @@ static void SDL2_Harness_Swap(br_pixelmap* back_buffer) {
         last_screen_src = back_buffer;
     }
 
-    // Update every frame
-	vmu_profiler_update();
-
     if (harness_game_config.fps != 0) {
         limit_fps();
     }
 }
 
-<<<<<<< HEAD
 static void SDL2_Harness_PaletteChanged(br_colour entries[256]) {
     int i;
     for (i = 0; i < 256; i++) {
         converted_palette[i] = (0xffu << 24 | BR_RED(entries[i]) << 16 | BR_GRN(entries[i]) << 8 | BR_BLU(entries[i]));
-=======
-static void set_palette(PALETTEENTRY_* pal) {
-    for (int i = 0; i < 256; i++) {
-        converted_palette[i] = (0xff << 24 | pal[i].peBlue << 16 | pal[i].peGreen << 8 | pal[i].peRed);
->>>>>>> origin/pvr
     }
     if (last_screen_src != NULL) {
         SDL2_Harness_Swap(last_screen_src);

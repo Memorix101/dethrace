@@ -441,7 +441,7 @@ void CopyDoubled8BitTo16BitRectangle(br_pixelmap* pDst, br_pixelmap* pSrc, int p
 
 // IDA: br_pixelmap* __usercall Scale8BitPixelmap@<EAX>(br_pixelmap *pSrc@<EAX>, int pWidth@<EDX>, int pHeight@<EBX>)
 br_pixelmap* Scale8BitPixelmap(br_pixelmap* pSrc, int pWidth, int pHeight) {
-    // br_pixelmap* result;
+    br_pixelmap* result;
     int x;
     int y;
     tU8* src_pixels;
@@ -568,7 +568,7 @@ br_uintptr_t CompareActorID(br_actor* pActor, void* pArg) {
 // FUNCTION: CARM95 0x004c214f
 br_actor* DRActorFindRecurse(br_actor* pSearch_root, char* pName) {
 
-    return (br_actor*)DRActorEnumRecurse(pSearch_root, (br_actor_enum_cbfn *)CompareActorID, pName);
+    return (br_actor*)DRActorEnumRecurse(pSearch_root, CompareActorID, pName);
 }
 
 // IDA: br_uint_32 __usercall DRActorEnumRecurseWithMat@<EAX>(br_actor *pActor@<EAX>, br_material *pMat@<EDX>, br_uint_32 (*pCall_back)(br_actor*, br_material*, void*)@<EBX>, void *pArg@<ECX>)

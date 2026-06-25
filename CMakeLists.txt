@@ -112,7 +112,6 @@ function(add_compile_flags_if_supported TARGET)
     endforeach()
 endfunction()
 
-<<<<<<< HEAD
 if(CMAKE_C_BYTE_ORDER STREQUAL "BIG_ENDIAN")
     set(WORDS_BIGENDIAN TRUE)
     add_definitions(-DBR_ENDIAN_BIG=1 -DBR_ENDIAN_LITTLE=0)
@@ -122,29 +121,6 @@ elseif(CMAKE_C_BYTE_ORDER STREQUAL "LITTLE_ENDIAN")
 else()
     set(WORDS_BIGENDIAN FALSE)
     message(WARNING "Endianness could not be determined.")
-=======
-if(DEFINED __DREAMCAST__)
-    set(PLATFORM_DREAMCAST TRUE)
-    add_compile_options(
-    -fno-lto
-    #-flto=auto
-    -Wno-incompatible-pointer-types 
-    -fbuiltin
-    -ffast-math
-    #-Wint-conversion
-    )
-endif()
-
-IF (NOT __DREAMCAST__)
-    test_big_endian(IS_BIGENDIAN)
-else()
-    set(IS_BIGENDIAN 0)
-endif()
-
-find_package(SDL2 CONFIG)
-if(NOT SDL2_FOUND)
-    find_package(SDL2 MODULE REQUIRED)
->>>>>>> origin/pvr
 endif()
 
 set(count_sdl_platforms 0)
