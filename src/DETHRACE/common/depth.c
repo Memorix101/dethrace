@@ -22,6 +22,17 @@
 
 tDepth_effect gDistance_depth_effects[4];
 
+#ifdef __DREAMCAST__
+// Hardware fog parameters for the PVR's table fog, recomputed each frame in
+// DepthEffect() from the same values the original software DoFog() would use
+// (see FogAccordingToGPSCDE), so the PowerVR fades distant geometry into the
+// fog colour instead of leaving a hard-edged background plane.
+int gDC_fog_enabled;
+br_scalar gDC_fog_min;
+br_scalar gDC_fog_max;
+br_colour gDC_fog_colour;
+#endif
+
 // GLOBAL: CARM95 0x00513430
 int gSky_on;
 
@@ -632,11 +643,21 @@ void DoHorizon(br_pixelmap* pRender_buffer, br_pixelmap* pDepth_buffer, br_actor
     br_actor* actor;
 
     yaw = BrRadianToAngle(atan2(pCamera_to_world->m[2][0], pCamera_to_world->m[2][2]));
-    if (gProgram_state.cockpit_on
+    if (
+#ifdef __DREAMCAST__
+        // ConditionallyFillWithSky() always reports the sky as "handled" on this
+        // platform to skip the CPU-only ExternalSky() blit below (graphics.c), so
+        // the external/chase view would otherwise never get more than a flat
+        // background colour. Render the textured sky dome through the normal 3D
+        // pipeline (and PVR texture cache) for every view, not just cockpit/replay.
+        1
+#else
+        gProgram_state.cockpit_on
         || (gAction_replay_mode * gAction_replay_camera_mode) != 0
 
 #ifdef DETHRACE_3DFX_PATCH
         || gBlitting_is_slow
+#endif
 #endif
     ) {
         if (gRendering_mirror) {
@@ -699,6 +720,23 @@ void DepthEffect(br_pixelmap* pRender_buffer, br_pixelmap* pDepth_buffer, br_act
         return;
     }
 #endif
+#ifdef __DREAMCAST__
+    // The software DoFog()/DoDepthCue() below blend pRender_buffer against
+    // pDepth_buffer, but pDepth_buffer is never written on this platform (the
+    // hardware 3D path bypasses the CPU rasteriser that would normally fill
+    // it), so they would be a no-op anyway. Instead hand the same fog range
+    // and colour the original engine computes off to the PowerVR's own table
+    // fog, applied per-pixel from the real hardware depth in DCPVR_Swap.
+    if (gProgram_state.current_depth_effect.type == eDepth_effect_fog) {
+        gDC_fog_enabled = 1;
+        gDC_fog_min = DepthCueingShiftToDistance(-gProgram_state.current_depth_effect.start);
+        gDC_fog_max = DepthCueingShiftToDistance(gProgram_state.current_depth_effect.end);
+        gDC_fog_colour = BR_COLOUR_RGB(248, 248, 248);
+    } else {
+        gDC_fog_enabled = 0;
+    }
+    return;
+#endif
     if (gProgram_state.current_depth_effect.type == eDepth_effect_darkness) {
         DoDepthCue(pRender_buffer, pDepth_buffer);
     }
@@ -709,12 +747,25 @@ void DepthEffect(br_pixelmap* pRender_buffer, br_pixelmap* pDepth_buffer, br_act
 
 // IDA: void __usercall DepthEffectSky(br_pixelmap *pRender_buffer@<EAX>, br_pixelmap *pDepth_buffer@<EDX>, br_actor *pCamera@<EBX>, br_matrix34 *pCamera_to_world@<ECX>)
 // FUNCTION: CARM95 0x00462609
+#ifdef __DREAMCAST__
+extern int g3d_diag_dohorizon_skip;
+extern int g3d_diag_dohorizon_run;
+#endif
+
 void DepthEffectSky(br_pixelmap* pRender_buffer, br_pixelmap* pDepth_buffer, br_actor* pCamera, br_matrix34* pCamera_to_world) {
 
     if (gProgram_state.current_depth_effect.sky_texture != NULL
         && (gLast_camera_special_volume == NULL || gLast_camera_special_volume->sky_col < 0)) {
+#ifdef __DREAMCAST__
+        g3d_diag_dohorizon_run++;
+#endif
         DoHorizon(pRender_buffer, pDepth_buffer, pCamera, pCamera_to_world);
     }
+#ifdef __DREAMCAST__
+    else {
+        g3d_diag_dohorizon_skip++;
+    }
+#endif
 }
 
 // IDA: void __usercall DoWobbleCamera(br_actor *pCamera@<EAX>)

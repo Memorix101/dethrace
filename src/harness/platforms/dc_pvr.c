@@ -37,6 +37,14 @@ extern br_pixelmap* gRender_screen;
 // Palette index of the solid sky colour, chosen by the game each frame (see
 // ConditionallyFillWithSky). Painted behind the hardware 3D.
 extern int gDC_sky_index;
+// Hardware fog parameters, recomputed each frame in DepthEffect() (depth.c)
+// from the same range/colour the original software DoFog() uses. gDC_fog_min/
+// max are eye-space distances in world units, matching what
+// pvr_fog_table_linear() expects.
+extern int gDC_fog_enabled;
+extern float gDC_fog_min;
+extern float gDC_fog_max;
+extern uint32_t gDC_fog_colour;
 
 static pvr_ptr_t pvram;
 static uint16_t converted_palette[256];
@@ -78,6 +86,19 @@ static int g3d_tri_count;
 static int g3d_last_submitted; // diagnostic: triangles drawn last frame
 static float g3d_dbg[6];       // diagnostic: first triangle's raw x,y,z per vertex
 
+// Temporary diagnostic counters (incremented from v1model.c's dc_triangle_fill)
+// to tell apart "genuinely untextured" triangles from "textured but PVR
+// registration failed" triangles, since both currently render as a flat colour.
+int g3d_diag_notex;
+int g3d_diag_texfail;
+extern int g3d_diag_nullps;
+extern int g3d_diag_nullbuf;
+extern int g3d_diag_wrongtype;
+extern int g3d_diag_lasttype;
+// diagnostic: how often DepthEffectSky actually calls DoHorizon (vs skips it)
+int g3d_diag_dohorizon_run;
+int g3d_diag_dohorizon_skip;
+
 // Texture cache: BRender's 8bpp paletted textures are converted once to RGB565
 // PowerVR textures, keyed by their source pixel pointer. Colours come from the
 // game's current palette.
@@ -86,11 +107,61 @@ typedef struct {
     pvr_ptr_t tex; // PVR texture memory
     int pw, ph;    // power-of-two PVR dimensions
     float us, vs;  // UV scale = real_size / pow2_size
+    int mipmapped; // 1 = square twiddled mipmap chain, 0 = plain non-twiddled
+    int last_used; // g3d_frame_num this slot was last hit or (re)registered
 } tDC3D_texture;
 
 #define DC3D_MAX_TEX 192
 static tDC3D_texture g3d_tex[DC3D_MAX_TEX];
 static int g3d_tex_count;
+// Incremented once per frame in DCPVR_Swap. Drives LRU eviction below.
+static int g3d_frame_num;
+
+// Free the least-recently-used texture that was NOT touched this frame (evicting
+// one still referenced by this frame's already-queued triangles would make them
+// point at whatever gets registered into the reused slot) and isn't already free.
+// Returns its slot index ready for reuse, or -1 if nothing is evictable.
+static int dc3d_evict_lru(void) {
+    int victim = -1;
+    int oldest = 0;
+    for (int i = 0; i < g3d_tex_count; i++) {
+        if (g3d_tex[i].key == NULL || g3d_tex[i].last_used >= g3d_frame_num) {
+            continue;
+        }
+        if (victim < 0 || g3d_tex[i].last_used < oldest) {
+            victim = i;
+            oldest = g3d_tex[i].last_used;
+        }
+    }
+    if (victim < 0) {
+        return -1;
+    }
+    pvr_mem_free(g3d_tex[victim].tex);
+    g3d_tex[victim].key = NULL;
+    g3d_tex[victim].tex = NULL;
+    return victim;
+}
+
+// pvr_mem_malloc, evicting LRU textures (not used this frame) and retrying on
+// failure, so a fragmented/full VRAM heap degrades by dropping old textures
+// instead of leaving newly-needed ones permanently unregistered.
+static pvr_ptr_t dc3d_alloc_evicting(uint32_t bytes) {
+    pvr_ptr_t p = pvr_mem_malloc(bytes);
+    int guard = DC3D_MAX_TEX;
+    while (p == NULL && guard-- > 0) {
+        if (dc3d_evict_lru() < 0) {
+            break;
+        }
+        p = pvr_mem_malloc(bytes);
+    }
+    return p;
+}
+
+// Only square textures up to this size get mipmaps (to bound VRAM use). Bilinear
+// mipmapping kills the texture shimmer/crawl on minified surfaces while moving.
+#define DC3D_MIP_MAX 256
+static uint16_t g3d_mip_a[DC3D_MIP_MAX * DC3D_MIP_MAX];
+static uint16_t g3d_mip_b[DC3D_MIP_MAX * DC3D_MIP_MAX];
 
 static int dc_pow2_ceil(int v) {
     int p = 8;
@@ -100,6 +171,44 @@ static int dc_pow2_ceil(int v) {
     return p;
 }
 
+// Byte offset of the mipmap level of side `size` within a twiddled 16bpp mipmap
+// texture (PowerVR layout, smallest level first after a 6-byte pad). From GLdc.
+static uint32_t dc_mip_offset(int size) {
+    switch (size) {
+    case 1024: return 0xAAAB0;
+    case 512:  return 0x2AAB0;
+    case 256:  return 0x0AAB0;
+    case 128:  return 0x02AB0;
+    case 64:   return 0x00AB0;
+    case 32:   return 0x002B0;
+    case 16:   return 0x000B0;
+    case 8:    return 0x00030;
+    case 4:    return 0x00010;
+    case 2:    return 0x00008;
+    case 1:    return 0x00006;
+    default:   return 0;
+    }
+}
+
+// Box-downsample an ARGB1555 image by 2x into dst. Alpha stays set if any of the
+// four source texels is opaque, so punch-through edges do not erode.
+static void dc_mip_downsample(const uint16_t* src, uint16_t* dst, int s) {
+    int d = s / 2;
+    for (int y = 0; y < d; y++) {
+        const uint16_t* r0 = src + (y * 2) * s;
+        const uint16_t* r1 = r0 + s;
+        uint16_t* o = dst + y * d;
+        for (int x = 0; x < d; x++) {
+            uint16_t p0 = r0[x * 2], p1 = r0[x * 2 + 1], p2 = r1[x * 2], p3 = r1[x * 2 + 1];
+            uint32_t a = ((p0 | p1 | p2 | p3) & 0x8000);
+            uint32_t r = (((p0 >> 10) & 0x1F) + ((p1 >> 10) & 0x1F) + ((p2 >> 10) & 0x1F) + ((p3 >> 10) & 0x1F)) >> 2;
+            uint32_t g = (((p0 >> 5) & 0x1F) + ((p1 >> 5) & 0x1F) + ((p2 >> 5) & 0x1F) + ((p3 >> 5) & 0x1F)) >> 2;
+            uint32_t b = ((p0 & 0x1F) + (p1 & 0x1F) + (p2 & 0x1F) + (p3 & 0x1F)) >> 2;
+            o[x] = (uint16_t)(a | (r << 10) | (g << 5) | b);
+        }
+    }
+}
+
 // Register (or look up) an 8bpp texture and return its cache index, or -1.
 int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
     if (pixels == NULL || w <= 0 || h <= 0) {
@@ -107,15 +216,76 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
     }
     for (int i = 0; i < g3d_tex_count; i++) {
         if (g3d_tex[i].key == pixels) {
+            g3d_tex[i].last_used = g3d_frame_num;
             return i;
         }
     }
-    if (g3d_tex_count >= DC3D_MAX_TEX) {
-        return -1;
+    // Prefer an already-freed slot (from a past eviction) over growing the
+    // array; only evict when the array is full and has no free slot either.
+    int slot = -1;
+    for (int i = 0; i < g3d_tex_count; i++) {
+        if (g3d_tex[i].key == NULL) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) {
+        if (g3d_tex_count < DC3D_MAX_TEX) {
+            slot = g3d_tex_count++;
+        } else {
+            slot = dc3d_evict_lru();
+            if (slot < 0) {
+                return -1;
+            }
+        }
     }
     int pw = dc_pow2_ceil(w);
     int ph = dc_pow2_ceil(h);
-    pvr_ptr_t tex = pvr_mem_malloc(pw * ph * 2);
+    const uint8_t* src = (const uint8_t*)pixels;
+
+    // Square textures up to DC3D_MIP_MAX get a twiddled mipmap chain (bilinear
+    // mipmapping removes the texture shimmer/crawl while moving). The base level
+    // is the clamped source in a pw x pw square; UV scale keeps the real w x h in
+    // the top-left. Non-square (or oversized) textures keep the plain
+    // non-twiddled path below.
+    if (pw == ph && pw <= DC3D_MIP_MAX) {
+        int s = pw;
+        pvr_ptr_t tex = dc3d_alloc_evicting((uint32_t)(s * s * 2) + dc_mip_offset(s));
+        if (tex != NULL) {
+            // Build the base level (s x s, ARGB1555, edge-clamped) in g3d_mip_a.
+            for (int y = 0; y < s; y++) {
+                const uint8_t* srow = src + (y < h ? y : h - 1) * stride;
+                uint16_t* drow = g3d_mip_a + y * s;
+                for (int x = 0; x < s; x++) {
+                    drow[x] = converted_palette_argb1555[srow[x < w ? x : w - 1]];
+                }
+            }
+            // Twiddle-load each level (largest first), downsampling as we go.
+            uint16_t* cur = g3d_mip_a;
+            uint16_t* nxt = g3d_mip_b;
+            for (int d = s; ; d /= 2) {
+                pvr_txr_load_ex(cur, (pvr_ptr_t)((uint8_t*)tex + dc_mip_offset(d)),
+                    (uint32_t)d, (uint32_t)d, PVR_TXRLOAD_16BPP);
+                if (d == 1) {
+                    break;
+                }
+                dc_mip_downsample(cur, nxt, d);
+                uint16_t* tmp = cur; cur = nxt; nxt = tmp;
+            }
+            g3d_tex[slot].key = pixels;
+            g3d_tex[slot].tex = tex;
+            g3d_tex[slot].pw = s;
+            g3d_tex[slot].ph = s;
+            g3d_tex[slot].us = (float)w / s;
+            g3d_tex[slot].vs = (float)h / s;
+            g3d_tex[slot].mipmapped = 1;
+            g3d_tex[slot].last_used = g3d_frame_num;
+            return slot;
+        }
+        // fall through to the plain path if the mipmap allocation failed
+    }
+
+    pvr_ptr_t tex = dc3d_alloc_evicting(pw * ph * 2);
     if (tex == NULL) {
         return -1;
     }
@@ -124,7 +294,6 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
     // black); punch-through surfaces are drawn in the PT list where alpha 0 is
     // keyed out, giving the transparent parts of fences, signs, etc.
     uint16_t* dst = (uint16_t*)tex;
-    const uint8_t* src = (const uint8_t*)pixels;
     for (int y = 0; y < ph; y++) {
         const uint8_t* srow = src + (y < h ? y : h - 1) * stride;
         uint16_t* drow = dst + y * pw;
@@ -132,14 +301,15 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
             drow[x] = converted_palette_argb1555[srow[x < w ? x : w - 1]];
         }
     }
-    int idx = g3d_tex_count++;
-    g3d_tex[idx].key = pixels;
-    g3d_tex[idx].tex = tex;
-    g3d_tex[idx].pw = pw;
-    g3d_tex[idx].ph = ph;
-    g3d_tex[idx].us = (float)w / pw;
-    g3d_tex[idx].vs = (float)h / ph;
-    return idx;
+    g3d_tex[slot].key = pixels;
+    g3d_tex[slot].tex = tex;
+    g3d_tex[slot].pw = pw;
+    g3d_tex[slot].ph = ph;
+    g3d_tex[slot].us = (float)w / pw;
+    g3d_tex[slot].vs = (float)h / ph;
+    g3d_tex[slot].mipmapped = 0;
+    g3d_tex[slot].last_used = g3d_frame_num;
+    return slot;
 }
 
 void DCPVR3D_AddTriTex(
@@ -199,9 +369,14 @@ static float g3d_sx, g3d_sy, g3d_ox, g3d_oy;
 // per pixel by 1/w; coplanar surfaces (a shadow/skidmark/marking on the road)
 // share the same 1/w, so during motion their order flips and they flicker. We
 // nudge each triangle's depth nearer in proportion to its submission order, so a
-// decal drawn after the road it sits on stays consistently in front. The factor
-// is tiny, far below real depth differences, so genuine occlusion is unaffected.
-#define DC3D_ZBIAS_PER_TRI 1.0e-6f
+// decal drawn after the road it sits on stays consistently in front. The bias is
+// relative (multiplies z), and `i` is the global submission index across the
+// whole frame (up to ~1800), so for very close geometry (large 1/w, e.g. the
+// player's own car) the old 1e-6 factor could grow bigger than the real depth
+// gap between two unrelated, merely-close-together triangles and flip their
+// order - showing up as jagged black spikes right around the car. Kept 100x
+// smaller so it stays well below genuine depth differences.
+#define DC3D_ZBIAS_PER_TRI 1.0e-8f
 
 static void dc3d_emit_vertex(const tDC3D_vertex* t, float us, float vs, float zmul, int eol) {
     pvr_vertex_t v;
@@ -259,12 +434,18 @@ static void dc3d_submit_list(int list, int want_cat) {
             cur_tex = tex;
             if (tex < 0) {
                 pvr_poly_cxt_col(&cxt, list);
+            } else if (g3d_tex[tex].mipmapped) {
+                // Twiddled square texture with a mipmap chain: bilinear mipmapping.
+                pvr_poly_cxt_txr(&cxt, list, PVR_TXRFMT_ARGB1555,
+                    g3d_tex[tex].pw, g3d_tex[tex].ph, g3d_tex[tex].tex, PVR_FILTER_BILINEAR);
+                cxt.txr.mipmap = PVR_MIPMAP_ENABLE;
             } else {
                 pvr_poly_cxt_txr(&cxt, list,
                     PVR_TXRFMT_ARGB1555 | PVR_TXRFMT_NONTWIDDLED,
                     g3d_tex[tex].pw, g3d_tex[tex].ph, g3d_tex[tex].tex, PVR_FILTER_BILINEAR);
             }
             cxt.gen.culling = PVR_CULLING_NONE;
+            cxt.gen.fog_type = gDC_fog_enabled ? PVR_FOG_TABLE : PVR_FOG_DISABLE;
             pvr_poly_compile(&hdr, &cxt);
             pvr_prim(&hdr, sizeof(hdr));
         }
@@ -435,17 +616,22 @@ static void DCPVR_CreateWindow(const char* title, int width, int height, tHarnes
 
     // Custom PVR init rather than pvr_init_defaults: we use three lists (opaque,
     // punch-through for index-0-transparent textures, translucent for blended
-    // decals + the HUD overlay), and the urban scenes push ~1200 triangles. The
-    // opb_overflow_count preallocates extra tile bins so dense tiles do not drop
-    // geometry - that overflow is exactly the "pieces flicker in and out along
-    // tile boundaries" artifact seen while moving. Bigger vertex buffer to match.
+    // decals + the HUD overlay), and the urban scenes push ~1200-1800 triangles.
+    // Bin size 16 + overflow_count 8 still let dense tiles overflow (textures
+    // popping in/out along tile boundaries while moving). OPB memory cost is
+    // (sum of active bin sizes) * tile_count * (1 + overflow_count), allocated
+    // twice (double-buffered) - PVR_BINSIZE_32 doubles the per-tile headroom, so
+    // overflow_count is kept low (it's a multiplier on the now-bigger base size)
+    // to land at roughly the same total OPB footprint as the old 16/8 config
+    // instead of starving the PVR texture heap (which caused an out-of-memory
+    // crash when both were maxed out at 32/16).
     pvr_init_params_t params = {
-        { PVR_BINSIZE_16, PVR_BINSIZE_0, PVR_BINSIZE_16, PVR_BINSIZE_0, PVR_BINSIZE_16 },
+        { PVR_BINSIZE_32, PVR_BINSIZE_0, PVR_BINSIZE_32, PVR_BINSIZE_0, PVR_BINSIZE_32 },
         1024 * 1024, // vertex buffer
         0,           // dma disabled
         0,           // fsaa disabled
         0,           // translucent autosort enabled
-        8,           // opb_overflow_count - extra OPBs to stop tile-overflow flicker
+        4,           // opb_overflow_count - extra OPBs to stop tile-overflow flicker
         0            // vertex buffer double-buffering enabled
     };
     pvr_init(&params);
@@ -505,6 +691,17 @@ static void DCPVR_Swap(br_pixelmap* back_buffer) {
     float vp_y0 = g3d_oy * g3d_sy;
     float vp_x1 = (g3d_ox + vp_w) * g3d_sx;
     float vp_y1 = (g3d_oy + vp_h) * g3d_sy;
+
+    // Hardware table fog must be configured outside scene begin/finish. Only
+    // touch it when active: the per-polygon fog_type set in dc3d_submit_list
+    // already stays PVR_FOG_DISABLE otherwise, so a stale table is harmless.
+    if (gDC_fog_enabled && gDC_fog_min < gDC_fog_max) {
+        float fr = ((gDC_fog_colour >> 16) & 0xFF) / 255.f;
+        float fg = ((gDC_fog_colour >> 8) & 0xFF) / 255.f;
+        float fb = (gDC_fog_colour & 0xFF) / 255.f;
+        pvr_fog_table_color(1.0f, fr, fg, fb);
+        pvr_fog_table_linear(gDC_fog_min, gDC_fog_max);
+    }
 
     pvr_wait_ready();
     pvr_scene_begin();
@@ -590,6 +787,7 @@ static void DCPVR_Swap(br_pixelmap* back_buffer) {
 
     // All three 3D passes consumed the buffer; reset for next frame.
     g3d_tri_count = 0;
+    g3d_frame_num++;
 
     if (harness_game_config.fps != 0) {
         Uint32 now = SDL_GetTicks();
@@ -608,25 +806,38 @@ static void DCPVR_Swap(br_pixelmap* back_buffer) {
     // Update the VMU FPS counter roughly twice a second (the LCD is slow to
     // write over maple, so we must not do it every frame).
     gFrame_count++;
-    if (gVmu != NULL) {
+    {
         Uint32 now = SDL_GetTicks();
         Uint32 elapsed = now - gFps_last_time;
         if (elapsed >= 500) {
             int fps = (int)((gFrame_count * 1000 + elapsed / 2) / elapsed);
             // Diagnostic: report fps and how many 3D triangles reached the PVR.
-            printf("[dcpvr] fps=%d tris=%d tex=%d back=%dx%d vp=%d,%d+%dx%d\n",
+            /*printf("[dcpvr] fps=%d tris=%d tex=%d back=%dx%d vp=%d,%d+%dx%d\n",
                 fps, g3d_last_submitted, g3d_tex_count,
                 (last_screen_src != NULL) ? last_screen_src->width : -1,
                 (last_screen_src != NULL) ? last_screen_src->height : -1,
                 (gRender_screen != NULL) ? gRender_screen->base_x : -1,
                 (gRender_screen != NULL) ? gRender_screen->base_y : -1,
                 (gRender_screen != NULL) ? gRender_screen->width : -1,
-                (gRender_screen != NULL) ? gRender_screen->height : -1);
-            char buf[16];
-            snprintf(buf, sizeof(buf), "FPS\n%d", fps);
-            vmufb_clear(&gVmu_fb);
-            vmufb_print_string_into(&gVmu_fb, NULL, 0, 0, 48, 32, 0, buf);
-            vmufb_present(&gVmu_fb, gVmu);
+                (gRender_screen != NULL) ? gRender_screen->height : -1);*/
+            printf("[dcpvr] fps=%d tris=%d tex=%d notex=%d texfail=%d nullps=%d nullbuf=%d wrongtype=%d lasttype=%d horizon_run=%d horizon_skip=%d\n",
+                fps, g3d_last_submitted, g3d_tex_count, g3d_diag_notex, g3d_diag_texfail,
+                g3d_diag_nullps, g3d_diag_nullbuf, g3d_diag_wrongtype, g3d_diag_lasttype,
+                g3d_diag_dohorizon_run, g3d_diag_dohorizon_skip);
+            g3d_diag_notex = 0;
+            g3d_diag_texfail = 0;
+            g3d_diag_nullps = 0;
+            g3d_diag_nullbuf = 0;
+            g3d_diag_wrongtype = 0;
+            g3d_diag_dohorizon_run = 0;
+            g3d_diag_dohorizon_skip = 0;
+            if (gVmu != NULL) {
+                char buf[16];
+                snprintf(buf, sizeof(buf), "FPS\n%d", fps);
+                vmufb_clear(&gVmu_fb);
+                vmufb_print_string_into(&gVmu_fb, NULL, 0, 0, 48, 32, 0, buf);
+                vmufb_present(&gVmu_fb, gVmu);
+            }
             gFrame_count = 0;
             gFps_last_time = now;
         }

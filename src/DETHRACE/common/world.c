@@ -2861,6 +2861,13 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
     SaveAdditionalStuff();
     GetAString(f, s);
     sky = BrMapFind(s);
+#ifndef __DREAMCAST__
+    // Austerity mode normally frees the sky texture to save RAM on very
+    // low-memory PC configs. Horizon textures are only a few tens of KB
+    // (negligible against the Dreamcast's 16 MB), and PDDoWeLeadAnAustereExistance()
+    // forces austerity mode on unconditionally there for other savings, so
+    // keep the sky texture on Dreamcast instead of losing the textured
+    // horizon and falling back to a flat fog fill.
     if (gAusterity_mode && sky) {
         for (i = 0; gTrack_storage_space.pixelmaps_count > i; ++i) {
             if (gTrack_storage_space.pixelmaps[i] == sky) {
@@ -2874,6 +2881,7 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
         sky = 0;
         killed_sky = 1;
     }
+#endif
     gProgram_state.default_depth_effect.sky_texture = sky;
     if (sky) {
         sky_pixels_high = gProgram_state.default_depth_effect.sky_texture->height;
