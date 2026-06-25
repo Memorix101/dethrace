@@ -332,10 +332,15 @@ int DRModelPick2D__raycast(br_model* model, br_material* material, br_vector3* r
             } else {
                 this_material = material;
             }
+<<<<<<< HEAD
             d = BrVector3Dot(eqn, ray_dir);
             if (fabs(d) >= 0.00000023841858f && ((this_material->flags & (BR_MATF_TWO_SIDED | BR_MATF_ALWAYS_VISIBLE)) != 0 || d <= 0.0)) //
+=======
+            d = BrVector3Dot((const br_vector3 *)eqn, ray_dir);
+            if (fabsf(d) >= 0.00000023841858f && ((this_material->flags & (BR_MATF_TWO_SIDED | BR_MATF_ALWAYS_VISIBLE)) != 0 || d <= 0.0)) //
+>>>>>>> origin/pvr
             {
-                numerator = BrVector3Dot(eqn, ray_pos) - eqn->v[3];
+                numerator = BrVector3Dot((const br_vector3 *)eqn, ray_pos) - eqn->v[3];
                 if (!BadDiv__raycast(numerator, d)) {
                     t = -(numerator / d);
                     if (t >= t_near && t <= t_far) {

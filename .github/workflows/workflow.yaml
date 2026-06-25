@@ -56,7 +56,11 @@ jobs:
         if: ${{ runner.os == 'Linux' }}
         run: |
           sudo apt-get update
+<<<<<<< HEAD
           sudo apt-get install -y libgl-dev libgl1-mesa-dev libglu1-mesa-dev libxext-dev
+=======
+          sudo apt-get install -y libgl-dev ${{ matrix.platform.apt-packages }}
+>>>>>>> origin/pvr
       - name: Set up SDL
         uses: libsdl-org/setup-sdl@main
         with:

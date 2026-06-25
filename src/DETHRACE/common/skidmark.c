@@ -79,13 +79,19 @@ void InitSkids(void) {
 #if defined(DETHRACE_FIX_BUGS)
     char mat_name[32];
 #endif
+<<<<<<< HEAD
 
+=======
+    LOG_TRACE("()");
+    char *saveptr;
+>>>>>>> origin/pvr
     for (mat = 0; mat < COUNT_OF(gMaterial_names); mat++) {
         gMaterial[mat] = BrMaterialFind(gProgram_state.sausage_eater_mode ? gBoring_material_names[mat] : gMaterial_names[mat]);
 
         if (gMaterial[mat] == NULL) {
 
 #if defined(DETHRACE_FIX_BUGS)
+<<<<<<< HEAD
             // Avoid modification of read-only data by strtok.
             strcpy(mat_name, gProgram_state.sausage_eater_mode ? gBoring_material_names[mat] : gMaterial_names[mat]);
             str = dethrace_strtok_r(mat_name, ".", &_dr_saveptr);
@@ -95,6 +101,15 @@ void InitSkids(void) {
 
             sl = strlen(str);
             strcat(str, ".PIX");
+=======
+            // Avoid modification of read-only data by strtok_r.
+            strcpy(mat_name, str);
+            str = mat_name;
+#endif
+            sl = strlen(strtok_r(str, ".", &saveptr));
+
+            strcpy(str + sl, ".PIX");
+>>>>>>> origin/pvr
             BrMapAdd(LoadPixelmap(str));
             str[sl] = '\0';
             strcat(str, ".MAT");

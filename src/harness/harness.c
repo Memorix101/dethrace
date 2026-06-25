@@ -15,11 +15,38 @@
 #include <string.h>
 #include <sys/stat.h>
 
+<<<<<<< HEAD
 extern br_uint_32 gI_am_cheating;
 extern int gSound_override;
 extern int gSausage_override;
 extern int gGraf_spec_index;
 extern int gAustere_override;
+=======
+#ifdef __DREAMCAST__
+#include <unistd.h>
+#include <kos.h>
+
+int access(const char *pathname, int mode) {
+    file_t fd;
+    int ret = 0;
+
+    /* Check if the file exists and can be opened for reading */
+    fd = fs_open(pathname, O_RDONLY);
+    if (fd >= 0) {
+        /* File exists and can be read */
+        fs_close(fd);
+    } else {
+        /* File doesn't exist or can't be read */
+        ret = -1;
+    }
+
+    return ret;
+}
+#endif
+
+br_pixelmap* palette;
+uint32_t* screen_buffer;
+>>>>>>> origin/pvr
 
 extern void Harness_Platform_Init(tHarness_platform* platform);
 
@@ -291,15 +318,22 @@ int Harness_Init(int* argc, char* argv[]) {
     printf("Dethrace version: %s\n", DETHRACE_VERSION);
 
     memset(&harness_game_info, 0, sizeof(harness_game_info));
-
+    printf("GPF WAS HERE!!\n");
     // disable the original CD check code
     harness_game_config.enable_cd_check = 0;
+<<<<<<< HEAD
     // original physics updates every 40ms, causing noticable camera juddering when cornering at slow speed
     // this setting runs physics every frame, smoothing movement out.
     // disabled by default for now until we are happy it doesn't cause other issues
     harness_game_config.physics_per_frame = 0;
     // limit to 60 fps by default
     harness_game_config.fps = 60;
+=======
+    // original physics time step. Lower values seem to work better at 30+ fps
+    harness_game_config.physics_step_time = 40; // 40
+    // do not limit fps by default
+    harness_game_config.fps = 0;
+>>>>>>> origin/pvr
     // do not freeze timer
     harness_game_config.freeze_timer = 0;
     // default demo time out is 240s
@@ -322,6 +356,7 @@ int Harness_Init(int* argc, char* argv[]) {
     // install signal handler
     harness_game_config.install_signalhandler = 1;
 
+<<<<<<< HEAD
     // first load ini file if exists
     Harness_ProcessIniFile();
 
@@ -341,6 +376,32 @@ int Harness_Init(int* argc, char* argv[]) {
     }
 
     Harness_DetectAndSetWorkingDirectory(argv[0]);
+=======
+    Harness_ProcessCommandLine(argc, argv);
+#ifndef __DREAMCAST__
+    if (harness_game_config.install_signalhandler) {
+        OS_InstallSignalHandler(argv[0]);
+    }
+#endif
+#ifdef __DREAMCAST__
+    char* root_dir = strdup("/cd/DETHRACE/");
+#else
+    char* root_dir = getenv("DETHRACE_ROOT_DIR");
+#endif
+    if (root_dir != NULL) {
+        LOG_INFO("DETHRACE_ROOT_DIR is set to '%s'", root_dir);
+    } else {
+        root_dir = OS_GetWorkingDirectory("argv[0]");
+    }
+    // if root_dir is null or empty, no need to chdir
+    if (root_dir != NULL && root_dir[0] != '\0') {
+        printf("Using root directory: %s\n", root_dir);
+        result = chdir(root_dir);
+        if (result != 0) {
+            LOG_PANIC("Failed to chdir. Error is %s", strerror(errno));
+        }
+    }
+>>>>>>> origin/pvr
 
     if (harness_game_info.mode == eGame_none) {
         Harness_DetectGameMode();

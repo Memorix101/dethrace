@@ -635,12 +635,17 @@ enum STBVorbisError {
 #include <arch/types.h>
 #else
 typedef unsigned char uint8;
-typedef signed char int8;
+typedef  char int8;
 typedef unsigned short uint16;
 typedef signed short int16;
+<<<<<<< HEAD
 typedef unsigned int uint32;
 typedef signed int int32;
 #endif
+=======
+typedef unsigned long uint32;
+typedef long int32;
+>>>>>>> origin/pvr
 
 #ifndef TRUE
 #define TRUE 1
@@ -4797,7 +4802,7 @@ static int go_to_page_before(stb_vorbis* f, unsigned int limit_offset) {
 
     set_file_offset(f, previous_safe);
 
-    while (vorbis_find_page(f, &end, NULL)) {
+    while (vorbis_find_page(f, (uint32 *)end, NULL)) {
         if (end >= limit_offset && stb_vorbis_get_file_offset(f) < limit_offset)
             return 1;
         set_file_offset(f, end);
@@ -5090,7 +5095,7 @@ unsigned int stb_vorbis_stream_length_in_samples(stb_vorbis* f) {
         // previous_safe is now our candidate 'earliest known place that seeking
         // to will lead to the final page'
 
-        if (!vorbis_find_page(f, &end, &last)) {
+        if (!vorbis_find_page(f, (uint32 *)end, (uint32 *)last)) {
             // if we can't find a page, we're hosed!
             f->error = VORBIS_cant_find_last_page;
             f->total_samples = 0xffffffff;
@@ -5105,7 +5110,7 @@ unsigned int stb_vorbis_stream_length_in_samples(stb_vorbis* f) {
         // explicitly checking the length of the section
         while (!last) {
             set_file_offset(f, end);
-            if (!vorbis_find_page(f, &end, &last)) {
+            if (!vorbis_find_page(f, (uint32 *)end, (uint32 *)last)) {
                 // the last page we found didn't have the 'last page' flag
                 // set. whoops!
                 break;

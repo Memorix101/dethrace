@@ -166,7 +166,7 @@ if(SDL2_FOUND)
         # Create SDL2::SDL2
         if(WIN32 AND SDL2_RUNTIME_LIBRARY)
             set(SDL2_DYNAMIC TRUE)
-            add_library(SDL2::SDL2 SHARED IMPORTED)
+            add_library(SDL2::SDL2 STATIC IMPORTED)
             set_target_properties(SDL2::SDL2
                 PROPERTIES
                 IMPORTED_IMPLIB "${SDL2_LIBRARY}"

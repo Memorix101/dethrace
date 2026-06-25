@@ -522,10 +522,10 @@ void PDAllocateScreenAndBack(void) {
     // this is a mix of windows and dos code
 
     dr_dprintf("PDAllocateScreenAndBack() - START...");
-    BrMaterialFindHook(PDMissingMaterial);
-    BrTableFindHook(PDMissingTable);
-    BrModelFindHook(PDMissingModel);
-    BrMapFindHook(PDMissingMap);
+    BrMaterialFindHook((br_material_find_cbfn *)PDMissingMaterial);
+    BrTableFindHook((br_table_find_cbfn *)PDMissingTable);
+    BrModelFindHook((br_model_find_cbfn *)PDMissingModel);
+    BrMapFindHook((br_map_find_cbfn *)PDMissingMap);
 
     int row_bytes;
     SSDXInitDirectDraw(gGraf_specs[gGraf_spec_index].total_width, gGraf_specs[gGraf_spec_index].total_height, &row_bytes);
@@ -671,8 +671,8 @@ void PDPixelmapVLineOnScreen(br_pixelmap* dst, br_int_16 x1, br_int_16 y1, br_in
 
 void PDInstallErrorHandlers(void) {
     gWin32_br_diaghandler.identifier = "LlantisilioBlahBlahBlahOgOgOch";
-    gWin32_br_diaghandler.warning = Win32BRenderWarningFunc;
-    gWin32_br_diaghandler.failure = Win32BRenderFailureFunc;
+    gWin32_br_diaghandler.warning = (void (*)(char *))Win32BRenderWarningFunc;
+    gWin32_br_diaghandler.failure = (void (*)(char *))Win32BRenderFailureFunc;
     BrDiagHandlerSet(&gWin32_br_diaghandler);
 }
 
@@ -811,7 +811,11 @@ void Win32AllocateActionReplayBuffer(void) {
         mem_status.dwTotalVirtual,
         mem_status.dwAvailVirtual);
 
+#ifdef __DREAMCAST__
+    buf_size = 500000;
+#else    
     buf_size = 20000000;
+#endif
 
     if (mem_status.dwTotalPhys < 16000000) {
         buf_size = 500000;
@@ -950,7 +954,15 @@ int original_main(int pArgc, char** pArgv) {
             Usage(pArgv[0]);
         }
     }
-
+#ifdef __DREAMCAST__    
+    gGraf_spec_index = 0;
+    gYon_multiplier = 1.0;
+    gCar_simplification_level = 3;
+    gCut_scene_override = 0;
+    gReplay_override = 0;
+    gSound_override = 0;
+    gAustere_override = 1;
+#endif
     gNetwork_profile_fname[0] = 0;
     uint32_t len = GetCurrentDirectoryA_(240, gNetwork_profile_fname);
     if (len > 0 && len == strlen(gNetwork_profile_fname)) {

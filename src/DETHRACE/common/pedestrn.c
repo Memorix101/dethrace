@@ -280,10 +280,10 @@ int gCurrent_ped_multiplier;
 // FUNCTION: CARM95 0x00455fcd
 void PedModelUpdate(br_model* pModel, br_scalar x0, br_scalar y0, br_scalar x1, br_scalar y1, br_scalar x2, br_scalar y2, br_scalar x3, br_scalar y3) {
 
-    BrVector2Set(&pModel->vertices[0].p, x0, y0);
-    BrVector2Set(&pModel->vertices[1].p, x1, y1);
-    BrVector2Set(&pModel->vertices[2].p, x2, y2);
-    BrVector2Set(&pModel->vertices[3].p, x3, y3);
+    BrVector2Set((br_vector2 *)&pModel->vertices[0].p, x0, y0);
+    BrVector2Set((br_vector2 *)&pModel->vertices[1].p, x1, y1);
+    BrVector2Set((br_vector2 *)&pModel->vertices[2].p, x2, y2);
+    BrVector2Set((br_vector2 *)&pModel->vertices[3].p, x3, y3);
     BrModelUpdate(pModel, BR_MATF_I_FROM_U);
 }
 
@@ -2684,7 +2684,12 @@ void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pIns
     br_scalar maxest_min;
     br_scalar minnest_max;
     br_scalar maxest_max;
+<<<<<<< HEAD
 
+=======
+    LOG_TRACE("(%p, %p, %d, %d, %d, %d)", pG, pInstructions, pInstruc_count, pInit_instruc, pRef_num, pForce_read);
+    char *saveptr;
+>>>>>>> origin/pvr
     PossibleService();
     the_pedestrian = &gPedestrian_array[gPed_count];
     gPed_count++;
@@ -2711,7 +2716,11 @@ void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pIns
         rewind(pG);
         do {
             GetALineAndDontArgue(pG, s);
+<<<<<<< HEAD
             str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
+=======
+            str = strtok_r(s, "\t ,/", &saveptr);
+>>>>>>> origin/pvr
             sscanf(str, "%d", &the_ref);
             if (the_pedestrian->ref_number != the_ref) {
                 while (1) {
@@ -2737,10 +2746,18 @@ void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pIns
         the_pedestrian->hit_points = GetAnInt(pG);
         the_pedestrian->active = 0;
         GetALineAndDontArgue(pG, s2);
+<<<<<<< HEAD
         str2 = dethrace_strtok_r(s2, "\t ,/", &_dr_saveptr);
         sscanf(str2, "%d", &the_pedestrian->number_of_exploding_sounds);
         for (j = 0; j < the_pedestrian->number_of_exploding_sounds; j++) {
             str2 = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
+=======
+        str2 = strtok_r(s2, "\t ,/", &saveptr);
+        sscanf(str2, "%d", &the_pedestrian->number_of_exploding_sounds);
+        for (j = 0; j < the_pedestrian->number_of_exploding_sounds; j++) {
+            str2 = strtok_r(0, "\t ,/", &saveptr);
+
+>>>>>>> origin/pvr
             sscanf(str2, "%d", &the_pedestrian->exploding_sounds[j]);
         }
         the_pedestrian->falling_sound = GetAnInt(pG);
@@ -2750,7 +2767,11 @@ void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pIns
         LoadNPixelmaps(&gPedestrians_storage_space, pG, 1);
         GetALineAndDontArgue(pG, s2);
         if (gPed_material == NULL) {
+<<<<<<< HEAD
             str2 = dethrace_strtok_r(s2, "\t ,/", &_dr_saveptr);
+=======
+            str2 = strtok_r(s2, "\t ,/", &saveptr);
+>>>>>>> origin/pvr
             PathCat(the_path, gApplication_path, "MATERIAL");
             PathCat(the_path, the_path, s2);
             gPed_material = BrMaterialLoad(the_path);
@@ -2807,10 +2828,17 @@ void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pIns
             GetPairOfFloats(pG, &the_action->initial_speed, &the_action->looping_speed);
             the_action->reaction_time = (tU32)(GetAFloat(pG) * 1000.0f);
             GetALineAndDontArgue(pG, s2);
+<<<<<<< HEAD
             str2 = dethrace_strtok_r(s2, "\t ,/", &_dr_saveptr);
             sscanf(str2, "%d", &the_action->number_of_sounds);
             for (j = 0; j < the_action->number_of_sounds; j++) {
                 str2 = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
+=======
+            str2 = strtok_r(s2, "\t ,/", &saveptr);
+            sscanf(str2, "%d", &the_action->number_of_sounds);
+            for (j = 0; j < the_action->number_of_sounds; j++) {
+                str2 = strtok_r(0, "\t ,/", &saveptr);
+>>>>>>> origin/pvr
                 sscanf(str2, "%d", &the_action->sounds[j]);
             }
             the_action->number_of_bearings = GetAnInt(pG);
@@ -2854,11 +2882,19 @@ void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pIns
                         BrMapAdd(the_sequence->frames[k].pixelmap);
                     }
                     GetALineAndDontArgue(pG, s);
+<<<<<<< HEAD
                     str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
                     sscanf(str, "%f", &temp_float1);
                     str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                     sscanf(str, "%f", &temp_float2);
                     str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
+=======
+                    str = strtok_r(s, "\t ,/", &saveptr);
+                    sscanf(str, "%f", &temp_float1);
+                    str = strtok_r(0, "\t ,/", &saveptr);
+                    sscanf(str, "%f", &temp_float2);
+                    str = strtok_r(0, "\t ,/", &saveptr);
+>>>>>>> origin/pvr
                     the_sequence->frames[k].offset.v[0] = temp_float1;
                     the_sequence->frames[k].offset.v[1] = temp_float2;
                     the_sequence->frames[k].flipped = strcmp(str, "flipped") == 0;
@@ -2955,7 +2991,12 @@ void LoadInPedestrians(FILE* pF, int pSubs_count, tPed_subs* pSubs_array) {
     tPedestrian_instruction* instructions;
     tPedestrian_instruction* the_instruction;
     tPed_choice* the_choice;
+<<<<<<< HEAD
 
+=======
+    LOG_TRACE("(%p, %d, %p)", pF, pSubs_count, pSubs_array);
+    char *saveptr;
+>>>>>>> origin/pvr
     knock_out = 0;
     check_for_duplicates = 0;
     duplicates_found = 0;
@@ -3023,12 +3064,17 @@ void LoadInPedestrians(FILE* pF, int pSubs_count, tPed_subs* pSubs_array) {
             case ePed_instruc_bchoice:
             case ePed_instruc_fchoice:
                 GetALineAndDontArgue(pF, s);
+<<<<<<< HEAD
                 str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
+=======
+                str = strtok_r(s, "\t ,/", &saveptr);
+>>>>>>> origin/pvr
                 sscanf(str, "%d", &the_instruction->data.choice_data.number_of_choices);
                 if (the_instruction->data.choice_data.number_of_choices > COUNT_OF(the_instruction->data.choice_data.choices)) {
                     FatalError(kFatalError_PedSeqTooManyChoices);
                 }
                 for (k = 0; k < the_instruction->data.choice_data.number_of_choices; k++) {
+<<<<<<< HEAD
                     str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                     sscanf(str, "%f", &temp_float1);
                     the_instruction->data.choice_data.choices[k].danger_level = (tU16)temp_float1;
@@ -3036,6 +3082,15 @@ void LoadInPedestrians(FILE* pF, int pSubs_count, tPed_subs* pSubs_array) {
                     sscanf(str, "%f", &temp_float1);
                     the_instruction->data.choice_data.choices[k].percentage_chance = (tU8)temp_float1;
                     str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
+=======
+                    str = strtok_r(0, "\t ,/", &saveptr);
+                    sscanf(str, "%f", &temp_float1);
+                    the_instruction->data.choice_data.choices[k].danger_level = (tU16)temp_float1;
+                    str = strtok_r(0, "\t ,/", &saveptr);
+                    sscanf(str, "%f", &temp_float1);
+                    the_instruction->data.choice_data.choices[k].percentage_chance = (tU8)temp_float1;
+                    str = strtok_r(0, "\t ,/", &saveptr);
+>>>>>>> origin/pvr
                     sscanf(str, "%d", &temp_int);
                     the_instruction->data.choice_data.choices[k].marker_ref = (tU8)temp_int;
                 }
@@ -3665,7 +3720,7 @@ br_uintptr_t KillActorsModel(br_actor* pActor, void* pArg) {
 void DisposePedPaths(void) {
 
     if (gPath_actor != NULL) {
-        DRActorEnumRecurse(gPath_actor, KillActorsModel, NULL);
+        DRActorEnumRecurse(gPath_actor, (br_actor_enum_cbfn *)KillActorsModel, NULL);
         BrActorRemove(gPath_actor);
         BrActorFree(gPath_actor);
         BrMaterialRemove(gPath_mat_normal);
