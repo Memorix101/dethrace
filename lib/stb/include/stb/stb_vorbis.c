@@ -628,12 +628,19 @@ enum STBVorbisError {
 #define MAX_BLOCKSIZE_LOG 13 // from specification
 #define MAX_BLOCKSIZE (1 << MAX_BLOCKSIZE_LOG)
 
+#ifdef __DREAMCAST__
+// KallistiOS already defines these integer types in <arch/types.h> and they are
+// layout-compatible on SH4, so reuse them instead of redeclaring (which would
+// conflict).
+#include <arch/types.h>
+#else
 typedef unsigned char uint8;
 typedef signed char int8;
 typedef unsigned short uint16;
 typedef signed short int16;
 typedef unsigned int uint32;
 typedef signed int int32;
+#endif
 
 #ifndef TRUE
 #define TRUE 1

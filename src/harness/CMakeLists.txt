@@ -17,8 +17,10 @@ endif()
 
 if(MSVC_42_FOR_RECCMP)
   target_link_libraries(harness PRIVATE brender inih compile_with_werror)
-else()
+elseif(DETHRACE_SOUND_ENABLED)
   target_link_libraries(harness PRIVATE brender miniaudio stb inih compile_with_werror)
+else()
+  target_link_libraries(harness PRIVATE brender inih compile_with_werror)
 endif()
 
 if(NOT MSVC)
@@ -58,7 +60,7 @@ target_sources(harness PRIVATE
 )
 
 if(DETHRACE_SOUND_ENABLED)
-    target_sources(harness PRIVATE audio/miniaudio.c)
+    target_sources(harness PRIVATE audio/miniaudio.c audio/stb_vorbis_impl.c)
     target_link_libraries(harness PRIVATE miniaudio stb)
 else()
     target_sources(harness PRIVATE audio/null.c)
@@ -72,6 +74,8 @@ elseif(WIN32)
     target_link_libraries(harness PRIVATE dbghelp ws2_32 iphlpapi)
 elseif(APPLE)
     target_sources(harness PRIVATE os/macos.c)
+elseif(__DREAMCAST__)
+    target_sources(harness PRIVATE os/dreamcast.c)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_sources(harness PRIVATE os/linux.c)
 else()
@@ -97,12 +101,22 @@ if(DETHRACE_PLATFORM_SDL1)
 endif()
 
 if(DETHRACE_PLATFORM_SDL2)
-    target_sources(harness PRIVATE
-        platforms/sdl2.c
-        platforms/sdl2_scancode_map.h
-        platforms/sdl2_syms.h
-    )
-    target_compile_definitions(harness PRIVATE DETHRACE_PLATFORM_SDL2)
+    if(__DREAMCAST__)
+        # On the Dreamcast, drive video through the PowerVR directly and use SDL2
+        # only for input (see platforms/dc_pvr.c).
+        target_sources(harness PRIVATE
+            platforms/dc_pvr.c
+            platforms/sdl2_scancode_map.h
+        )
+        target_compile_definitions(harness PRIVATE DETHRACE_PLATFORM_DCPVR)
+    else()
+        target_sources(harness PRIVATE
+            platforms/sdl2.c
+            platforms/sdl2_scancode_map.h
+            platforms/sdl2_syms.h
+        )
+        target_compile_definitions(harness PRIVATE DETHRACE_PLATFORM_SDL2)
+    endif()
 
     if(DETHRACE_PLATFORM_SDL_DYNAMIC)
         set_property(SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/platforms/sdl2.c" APPEND PROPERTY INCLUDE_DIRECTORIES "$<TARGET_PROPERTY:SDL2::SDL2,INTERFACE_INCLUDE_DIRECTORIES>")

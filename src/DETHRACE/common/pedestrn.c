@@ -28,6 +28,34 @@
 #include "world.h"
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
+
+// Reentrant tokenizer. The original game uses strtok, whose global state is
+// corrupted when tokenizing happens in nested calls (one strtok loop calling a
+// function that itself tokenizes). That mis-parses and crashes on the
+// Dreamcast. dethrace_strtok_r keeps its state in a caller-supplied pointer, so
+// each function gets its own and nesting is safe.
+static char* dethrace_strtok_r(char* str, const char* delim, char** saveptr) {
+    char* token;
+    if (str == NULL) {
+        str = *saveptr;
+    }
+    str += strspn(str, delim);
+    if (*str == '\0') {
+        *saveptr = str;
+        return NULL;
+    }
+    token = str;
+    str = strpbrk(token, delim);
+    if (str == NULL) {
+        *saveptr = token + strlen(token);
+    } else {
+        *str = '\0';
+        *saveptr = str + 1;
+    }
+    return token;
+}
+
 
 #define FLAG_WAVING_BASTARD_REF 99
 #define ACTIVE_PED_DXDZ 11.f
@@ -2630,6 +2658,7 @@ int GetPedPosition(int pIndex, br_vector3* pPos) {
 // IDA: void __usercall CreatePedestrian(FILE *pG@<EAX>, tPedestrian_instruction *pInstructions@<EDX>, int pInstruc_count@<EBX>, int pInit_instruc@<ECX>, int pRef_num, int pForce_read)
 // FUNCTION: CARM95 0x0045cb28
 void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pInstruc_count, int pInit_instruc, int pRef_num, int pForce_read) {
+    char* _dr_saveptr;
     tPath_name the_path;
     char s[256];
     char s2[256];
@@ -2682,7 +2711,7 @@ void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pIns
         rewind(pG);
         do {
             GetALineAndDontArgue(pG, s);
-            str = strtok(s, "\t ,/");
+            str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &the_ref);
             if (the_pedestrian->ref_number != the_ref) {
                 while (1) {
@@ -2708,10 +2737,10 @@ void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pIns
         the_pedestrian->hit_points = GetAnInt(pG);
         the_pedestrian->active = 0;
         GetALineAndDontArgue(pG, s2);
-        str2 = strtok(s2, "\t ,/");
+        str2 = dethrace_strtok_r(s2, "\t ,/", &_dr_saveptr);
         sscanf(str2, "%d", &the_pedestrian->number_of_exploding_sounds);
         for (j = 0; j < the_pedestrian->number_of_exploding_sounds; j++) {
-            str2 = strtok(NULL, "\t ,/");
+            str2 = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str2, "%d", &the_pedestrian->exploding_sounds[j]);
         }
         the_pedestrian->falling_sound = GetAnInt(pG);
@@ -2721,7 +2750,7 @@ void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pIns
         LoadNPixelmaps(&gPedestrians_storage_space, pG, 1);
         GetALineAndDontArgue(pG, s2);
         if (gPed_material == NULL) {
-            str2 = strtok(s2, "\t ,/");
+            str2 = dethrace_strtok_r(s2, "\t ,/", &_dr_saveptr);
             PathCat(the_path, gApplication_path, "MATERIAL");
             PathCat(the_path, the_path, s2);
             gPed_material = BrMaterialLoad(the_path);
@@ -2778,10 +2807,10 @@ void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pIns
             GetPairOfFloats(pG, &the_action->initial_speed, &the_action->looping_speed);
             the_action->reaction_time = (tU32)(GetAFloat(pG) * 1000.0f);
             GetALineAndDontArgue(pG, s2);
-            str2 = strtok(s2, "\t ,/");
+            str2 = dethrace_strtok_r(s2, "\t ,/", &_dr_saveptr);
             sscanf(str2, "%d", &the_action->number_of_sounds);
             for (j = 0; j < the_action->number_of_sounds; j++) {
-                str2 = strtok(NULL, "\t ,/");
+                str2 = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                 sscanf(str2, "%d", &the_action->sounds[j]);
             }
             the_action->number_of_bearings = GetAnInt(pG);
@@ -2825,11 +2854,11 @@ void CreatePedestrian(FILE* pG, tPedestrian_instruction* pInstructions, int pIns
                         BrMapAdd(the_sequence->frames[k].pixelmap);
                     }
                     GetALineAndDontArgue(pG, s);
-                    str = strtok(s, "\t ,/");
+                    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
                     sscanf(str, "%f", &temp_float1);
-                    str = strtok(NULL, "\t ,/");
+                    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                     sscanf(str, "%f", &temp_float2);
-                    str = strtok(NULL, "\t ,/");
+                    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                     the_sequence->frames[k].offset.v[0] = temp_float1;
                     the_sequence->frames[k].offset.v[1] = temp_float2;
                     the_sequence->frames[k].flipped = strcmp(str, "flipped") == 0;
@@ -2901,6 +2930,7 @@ void ResetPedMaterial(void) {
 // IDA: void __usercall LoadInPedestrians(FILE *pF@<EAX>, int pSubs_count@<EDX>, tPed_subs *pSubs_array@<EBX>)
 // FUNCTION: CARM95 0x0045dab2
 void LoadInPedestrians(FILE* pF, int pSubs_count, tPed_subs* pSubs_array) {
+    char* _dr_saveptr;
     tPath_name the_path;
     char s[256];
     char s2[256];
@@ -2993,19 +3023,19 @@ void LoadInPedestrians(FILE* pF, int pSubs_count, tPed_subs* pSubs_array) {
             case ePed_instruc_bchoice:
             case ePed_instruc_fchoice:
                 GetALineAndDontArgue(pF, s);
-                str = strtok(s, "\t ,/");
+                str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
                 sscanf(str, "%d", &the_instruction->data.choice_data.number_of_choices);
                 if (the_instruction->data.choice_data.number_of_choices > COUNT_OF(the_instruction->data.choice_data.choices)) {
                     FatalError(kFatalError_PedSeqTooManyChoices);
                 }
                 for (k = 0; k < the_instruction->data.choice_data.number_of_choices; k++) {
-                    str = strtok(NULL, "\t ,/");
+                    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                     sscanf(str, "%f", &temp_float1);
                     the_instruction->data.choice_data.choices[k].danger_level = (tU16)temp_float1;
-                    str = strtok(NULL, "\t ,/");
+                    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                     sscanf(str, "%f", &temp_float1);
                     the_instruction->data.choice_data.choices[k].percentage_chance = (tU8)temp_float1;
-                    str = strtok(NULL, "\t ,/");
+                    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                     sscanf(str, "%d", &temp_int);
                     the_instruction->data.choice_data.choices[k].marker_ref = (tU8)temp_int;
                 }

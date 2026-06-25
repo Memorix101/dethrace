@@ -32,6 +32,33 @@
 #include <float.h>
 #include <string.h>
 
+// Reentrant tokenizer. The original game uses strtok, whose global state is
+// corrupted when tokenizing happens in nested calls (one strtok loop calling a
+// function that itself tokenizes). That mis-parses and crashes on the
+// Dreamcast. dethrace_strtok_r keeps its state in a caller-supplied pointer, so
+// each function gets its own and nesting is safe.
+static char* dethrace_strtok_r(char* str, const char* delim, char** saveptr) {
+    char* token;
+    if (str == NULL) {
+        str = *saveptr;
+    }
+    str += strspn(str, delim);
+    if (*str == '\0') {
+        *saveptr = str;
+        return NULL;
+    }
+    token = str;
+    str = strpbrk(token, delim);
+    if (str == NULL) {
+        *saveptr = token + strlen(token);
+    } else {
+        *str = '\0';
+        *saveptr = str + 1;
+    }
+    return token;
+}
+
+
 // GLOBAL: CARM95 0x0050c710
 int gFunkotronics_array_size;
 
@@ -391,6 +418,7 @@ tAdd_to_storage_result AddModelToStorage(tBrender_storage* pStorage_space, br_mo
 // IDA: int __usercall LoadNPixelmaps@<EAX>(tBrender_storage *pStorage_space@<EAX>, FILE *pF@<EDX>, int pCount@<EBX>)
 // FUNCTION: CARM95 0x00435402
 int LoadNPixelmaps(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
+    char* _dr_saveptr;
     tPath_name the_path;
     int i;
     int j;
@@ -404,7 +432,7 @@ int LoadNPixelmaps(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     for (i = 0; i < pCount; ++i) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         PathCat(the_path, gApplication_path, gGraf_specs[gGraf_spec_index].data_dir_name);
         PathCat(the_path, the_path, "PIXELMAP");
         PathCat(the_path, the_path, str);
@@ -496,6 +524,7 @@ br_material* LoadSingleMaterial(tBrender_storage* pStorage_space, char* pName) {
 // IDA: int __usercall LoadNShadeTables@<EAX>(tBrender_storage *pStorage_space@<EAX>, FILE *pF@<EDX>, int pCount@<EBX>)
 // FUNCTION: CARM95 0x004357fc
 int LoadNShadeTables(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
+    char* _dr_saveptr;
     tPath_name the_path;
     int i;
     int j;
@@ -509,7 +538,7 @@ int LoadNShadeTables(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     for (i = 0; i < pCount; i++) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         PathCat(the_path, gApplication_path, "SHADETAB");
         PathCat(the_path, the_path, str);
         new_ones = DRPixelmapLoadMany(the_path, temp_array, 50);
@@ -566,6 +595,7 @@ br_pixelmap* LoadSingleShadeTable(tBrender_storage* pStorage_space, char* pName)
 // IDA: int __usercall LoadNMaterials@<EAX>(tBrender_storage *pStorage_space@<EAX>, FILE *pF@<EDX>, int pCount@<EBX>)
 // FUNCTION: CARM95 0x00435a92
 int LoadNMaterials(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
+    char* _dr_saveptr;
     tPath_name the_path;
     int i;
     int j;
@@ -579,7 +609,7 @@ int LoadNMaterials(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     for (i = 0; i < pCount; ++i) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         PathCat(the_path, gApplication_path, "MATERIAL");
         PathCat(the_path, the_path, str);
         new_ones = BrMaterialLoadMany(the_path, temp_array, 200);
@@ -612,6 +642,7 @@ int LoadNMaterials(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
 // IDA: int __usercall LoadNModels@<EAX>(tBrender_storage *pStorage_space@<EAX>, FILE *pF@<EDX>, int pCount@<EBX>)
 // FUNCTION: CARM95 0x00435c60
 int LoadNModels(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
+    char* _dr_saveptr;
     tPath_name the_path;
     int i;
     int j;
@@ -627,7 +658,7 @@ int LoadNModels(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     for (i = 0; i < pCount; i++) {
         PossibleService();
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         PathCat(the_path, gApplication_path, "MODELS");
         PathCat(the_path, the_path, str);
         new_ones = BrModelLoadMany(the_path, temp_array, 2000);
@@ -818,6 +849,7 @@ void ProcessModelFaceMaterials(br_model* pModel, tPMFMCB pCallback) {
 // IDA: int __usercall LoadNTrackModels@<EAX>(tBrender_storage *pStorage_space@<EAX>, FILE *pF@<EDX>, int pCount@<EBX>)
 // FUNCTION: CARM95 0x00436325
 int LoadNTrackModels(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
+    char* _dr_saveptr;
     tPath_name the_path;
     int i;
     int j;
@@ -832,7 +864,7 @@ int LoadNTrackModels(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
     total = 0;
     for (i = 0; i < pCount; i++) {
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         PathCat(the_path, gApplication_path, "MODELS");
         PathCat(the_path, the_path, str);
         new_ones = BrModelLoadMany(the_path, temp_array, 2000);
@@ -877,6 +909,7 @@ int LoadNTrackModels(tBrender_storage* pStorage_space, FILE* pF, int pCount) {
 // IDA: void __usercall LoadSomePixelmaps(tBrender_storage *pStorage_space@<EAX>, FILE *pF@<EDX>)
 // FUNCTION: CARM95 0x004366f3
 void LoadSomePixelmaps(tBrender_storage* pStorage_space, FILE* pF) {
+    char* _dr_saveptr;
     tPath_name the_path;
     int i;
     int j;
@@ -887,7 +920,7 @@ void LoadSomePixelmaps(tBrender_storage* pStorage_space, FILE* pF) {
     br_pixelmap* temp_array[200];
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", &count);
     LoadNPixelmaps(pStorage_space, pF, count);
 }
@@ -895,6 +928,7 @@ void LoadSomePixelmaps(tBrender_storage* pStorage_space, FILE* pF) {
 // IDA: void __usercall LoadSomeShadeTables(tBrender_storage *pStorage_space@<EAX>, FILE *pF@<EDX>)
 // FUNCTION: CARM95 0x0043675d
 void LoadSomeShadeTables(tBrender_storage* pStorage_space, FILE* pF) {
+    char* _dr_saveptr;
     tPath_name the_path;
     int i;
     int j;
@@ -905,7 +939,7 @@ void LoadSomeShadeTables(tBrender_storage* pStorage_space, FILE* pF) {
     br_pixelmap* temp_array[50];
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", &count);
     LoadNShadeTables(pStorage_space, pF, count);
 }
@@ -913,6 +947,7 @@ void LoadSomeShadeTables(tBrender_storage* pStorage_space, FILE* pF) {
 // IDA: void __usercall LoadSomeMaterials(tBrender_storage *pStorage_space@<EAX>, FILE *pF@<EDX>)
 // FUNCTION: CARM95 0x004367c7
 void LoadSomeMaterials(tBrender_storage* pStorage_space, FILE* pF) {
+    char* _dr_saveptr;
     tPath_name the_path;
     int i;
     int j;
@@ -923,7 +958,7 @@ void LoadSomeMaterials(tBrender_storage* pStorage_space, FILE* pF) {
     br_material* temp_array[200];
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", &count);
     LoadNMaterials(pStorage_space, pF, count);
 }
@@ -931,6 +966,7 @@ void LoadSomeMaterials(tBrender_storage* pStorage_space, FILE* pF) {
 // IDA: void __usercall LoadSomeModels(tBrender_storage *pStorage_space@<EAX>, FILE *pF@<EDX>)
 // FUNCTION: CARM95 0x00436831
 void LoadSomeModels(tBrender_storage* pStorage_space, FILE* pF) {
+    char* _dr_saveptr;
     tPath_name the_path;
     int i;
     int j;
@@ -941,7 +977,7 @@ void LoadSomeModels(tBrender_storage* pStorage_space, FILE* pF) {
     br_model* temp_array[2000];
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", &count);
     LoadNModels(pStorage_space, pF, count);
 }
@@ -949,6 +985,7 @@ void LoadSomeModels(tBrender_storage* pStorage_space, FILE* pF) {
 // IDA: void __usercall LoadSomeTrackModels(tBrender_storage *pStorage_space@<EAX>, FILE *pF@<EDX>)
 // FUNCTION: CARM95 0x0043689f
 void LoadSomeTrackModels(tBrender_storage* pStorage_space, FILE* pF) {
+    char* _dr_saveptr;
     tPath_name the_path;
     int i;
     int j;
@@ -959,7 +996,7 @@ void LoadSomeTrackModels(tBrender_storage* pStorage_space, FILE* pF) {
     br_model* temp_array[2000];
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", &count);
     LoadNTrackModels(pStorage_space, pF, count);
 }
@@ -1195,6 +1232,7 @@ void Adjust2FloatsForExceptions(float* pVictim1, float* pVictim2, br_pixelmap* p
 // IDA: void __usercall AddFunkotronics(FILE *pF@<EAX>, int pOwner@<EDX>, int pRef_offset@<EBX>)
 // FUNCTION: CARM95 0x00436b8b
 void AddFunkotronics(FILE* pF, int pOwner, int pRef_offset) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
     int first_time;
@@ -1228,7 +1266,7 @@ void AddFunkotronics(FILE* pF, int pOwner, int pRef_offset) {
             }
         }
         first_time = 0;
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         the_funk = AddNewFunkotronic();
         the_funk->owner = pOwner;
         the_funk->material = BrMaterialFind(str);
@@ -1532,6 +1570,7 @@ tGroovidelic_spec* AddNewGroovidelic(void) {
 // IDA: void __usercall AddGroovidelics(FILE *pF@<EAX>, int pOwner@<EDX>, br_actor *pParent_actor@<EBX>, int pRef_offset@<ECX>, int pAllowed_to_be_absent)
 // FUNCTION: CARM95 0x00438146
 void AddGroovidelics(FILE* pF, int pOwner, br_actor* pParent_actor, int pRef_offset, int pAllowed_to_be_absent) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
     int first_time;
@@ -1556,7 +1595,7 @@ void AddGroovidelics(FILE* pF, int pOwner, br_actor* pParent_actor, int pRef_off
             }
         }
         first_time = 0;
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         the_groove = AddNewGroovidelic();
         the_groove->owner = pOwner;
         the_groove->actor = DRActorFindRecurse(pParent_actor, str);
@@ -2468,6 +2507,7 @@ void AddExceptionToList(tException_list* pDst, tException_list pNew) {
 
 // IDA: void __usercall LoadExceptionsFile(char *pName@<EAX>)
 void LoadExceptionsFile(char* pName) {
+    char* _dr_saveptr;
     FILE* f;
     char line[256];
     char* tok;
@@ -2479,18 +2519,18 @@ void LoadExceptionsFile(char* pName) {
     f = DRfopen(pName, "rt");
     if (f) {
         GetALineAndDontArgue(f, line);
-        tok = strtok(line, delimiters);
+        tok = dethrace_strtok_r(line, delimiters, &_dr_saveptr);
         if (DRStricmp(tok, "VERSION")) {
             FatalError(kFatalError_FileMustStartWith_S, pName, "VERSION");
         }
-        tok = strtok(NULL, delimiters);
+        tok = dethrace_strtok_r(NULL, delimiters, &_dr_saveptr);
         if (sscanf(tok, "%d", &file_version) == 0 || file_version != 1) {
             FatalError(kFatalError_CantCopeWithVersionFor_S, tok, pName);
         }
 
         while (1) {
             GetALineAndDontArgue(f, line);
-            tok = strtok(line, delimiters);
+            tok = dethrace_strtok_r(line, delimiters, &_dr_saveptr);
             if (DRStricmp(tok, "end") == 0) {
                 break;
             }
@@ -2499,7 +2539,7 @@ void LoadExceptionsFile(char* pName) {
             strcpy(e->name, tok);
             e->flags = 0;
             while (1) {
-                tok = strtok(NULL, delimiters);
+                tok = dethrace_strtok_r(NULL, delimiters, &_dr_saveptr);
                 if (tok == NULL || !isalpha(tok[0])) {
                     break;
                 }
@@ -2557,6 +2597,7 @@ void FreeExceptions(void) {
 // IDA: void __usercall LoadTrack(char *pFile_name@<EAX>, tTrack_spec *pTrack_spec@<EDX>, tRace_info *pRace_info@<EBX>)
 // FUNCTION: CARM95 0x0043a136
 void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_info) {
+    char* _dr_saveptr;
     char temp_name[14];
     FILE* f;
     FILE* non_car_f;
@@ -2613,26 +2654,26 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
         FatalError(kFatalError_OpenRacesFile);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     if (strcmp(s, "VERSION") == 0) {
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &gRace_file_version);
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     } else {
         gRace_file_version = 0;
     }
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_position.v[0] = temp_float;
-    str = strtok(0, "\t ,/");
+    str = dethrace_strtok_r(0, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_position.v[1] = temp_float;
-    str = strtok(0, "\t ,/");
+    str = dethrace_strtok_r(0, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_position.v[2] = temp_float;
     PossibleService();
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", &temp_float);
     pRace_info->initial_yaw = temp_float;
     GetThreeInts(f, pRace_info->initial_timer, &pRace_info->initial_timer[1], &pRace_info->initial_timer[2]);
@@ -2749,19 +2790,19 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
         if (gAusterity_mode) {
             GetALineAndDontArgue(f, s);
             GetALineAndDontArgue(f, s);
-            str = strtok(s, "\t ,/");
+            str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
             PathCat(the_path, gApplication_path, "ACTORS");
             PathCat(the_path, the_path, str);
         } else {
             GetALineAndDontArgue(f, s);
-            str = strtok(s, "\t ,/");
+            str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
             PathCat(the_path, gApplication_path, "ACTORS");
             PathCat(the_path, the_path, str);
             GetALineAndDontArgue(f, s);
         }
     } else {
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         PathCat(the_path, gApplication_path, "ACTORS");
         PathCat(the_path, the_path, str);
     }
@@ -2802,15 +2843,15 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
     }
     BrActorAdd(gUniverse_actor, pTrack_spec->the_actor);
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
-    str = strtok(str, ".");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
+    str = dethrace_strtok_r(str, ".", &_dr_saveptr);
     strcat(str, ".DAT");
     PathCat(gAdditional_model_path, gApplication_path, "MODELS");
     PathCat(gAdditional_model_path, gAdditional_model_path, str);
     gNumber_of_additional_models = 0;
     PossibleService();
-    str = strtok(s, "\t ,/");
-    str = strtok(str, ".");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
+    str = dethrace_strtok_r(str, ".", &_dr_saveptr);
     strcat(str, ".ACT");
     PathCat(gAdditional_actor_path, gApplication_path, "ACTORS");
     PathCat(gAdditional_actor_path, gAdditional_actor_path, str);
@@ -2901,11 +2942,11 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
                 spec->no_mat = 1;
             } else {
                 spec->no_mat = 0;
-                str = strtok(s, "\t ,/");
+                str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
                 sscanf(str, "%f", &spec->bounds.min.v[0]);
-                str = strtok(0, "\t ,/");
+                str = dethrace_strtok_r(0, "\t ,/", &_dr_saveptr);
                 sscanf(str, "%f", &spec->bounds.min.v[1]);
-                str = strtok(0, "\t ,/");
+                str = dethrace_strtok_r(0, "\t ,/", &_dr_saveptr);
                 sscanf(str, "%f", &spec->bounds.min.v[2]);
                 GetThreeScalars(f, &spec->bounds.max.v[0], &spec->bounds.max.v[1], &spec->bounds.max.v[2]);
                 BrMatrix34Identity(&spec->mat);
@@ -2998,7 +3039,7 @@ void LoadTrack(char* pFile_name, tTrack_spec* pTrack_spec, tRace_info* pRace_inf
         pRace_info->material_modifiers[i].sparkiness = GetAScalar(f);
         pRace_info->material_modifiers[i].smoke_type = GetAnInt(f);
         GetAString(f, s);
-        str = strtok(s, ".");
+        str = dethrace_strtok_r(s, ".", &_dr_saveptr);
 
         if (!strcmp(s, "none") || !strcmp(s, "NONE") || !strcmp(s, "0") || !strcmp(s, "1")) {
             pRace_info->material_modifiers[i].skid_mark_material = NULL;
@@ -4459,11 +4500,12 @@ br_uint_32 CalcHighestID(br_actor* pActor, int* pHighest) {
 // IDA: br_uint_32 __cdecl SetID(br_actor *pActor, void *pArg)
 // FUNCTION: CARM95 0x004435e0
 br_uint_32 SetID(br_actor* pActor, void* pArg) {
+    char* _dr_saveptr;
     char s[256];
 
     if (pActor->identifier != NULL) {
         strcpy(s, pActor->identifier);
-        strtok(s, ".");
+        dethrace_strtok_r(s, ".", &_dr_saveptr);
         strcat(s, "0000");
         sprintf(&s[4], "%04d", (int)(intptr_t)pArg);
         strcat(s, ".ACT");
@@ -4502,6 +4544,7 @@ void AccessoryHeadup(br_actor* pActor, char* pPrefix) {
 // IDA: br_uint_32 __cdecl CalcHighestNonAmID(br_actor *pActor, int *pHighest)
 // FUNCTION: CARM95 0x00443504
 br_uint_32 CalcHighestNonAmID(br_actor* pActor, int* pHighest) {
+    char* _dr_saveptr;
     char s[256];
     int number;
 
@@ -4511,7 +4554,7 @@ br_uint_32 CalcHighestNonAmID(br_actor* pActor, int* pHighest) {
             number = 0;
         } else {
             strcpy(s, &pActor->identifier[4]);
-            strtok(s, ".");
+            dethrace_strtok_r(s, ".", &_dr_saveptr);
             sscanf(s, "%d", &number);
         }
         if (*pHighest < number) {
@@ -4525,6 +4568,7 @@ br_uint_32 CalcHighestNonAmID(br_actor* pActor, int* pHighest) {
 // IDA: br_uint_32 __cdecl SetIDAndDupModel(br_actor *pActor, void *pArg)
 // FUNCTION: CARM95 0x00443ef5
 br_uint_32 SetIDAndDupModel(br_actor* pActor, void* pArg) {
+    char* _dr_saveptr;
     char s[256];
     char s2[256];
     br_model* new_model;
@@ -4534,7 +4578,7 @@ br_uint_32 SetIDAndDupModel(br_actor* pActor, void* pArg) {
             *(int*)(uintptr_t)pArg = *(int*)(uintptr_t)pArg + 1;
             strcpy(s, pActor->identifier);
             s[0] = '@';
-            strtok(s, ".");
+            dethrace_strtok_r(s, ".", &_dr_saveptr);
             strcat(s, "0000");
             sprintf(&s[4], "%04d", *(int*)(uintptr_t)pArg);
             strcpy(s2, s);

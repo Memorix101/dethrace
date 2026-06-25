@@ -178,6 +178,9 @@ target_sources(dethrace_obj PRIVATE
 
 if(MSVC_42_FOR_RECCMP)
     target_sources(dethrace_obj PRIVATE pc-win95/win95net.c)
+elseif(NOT DETHRACE_NET_ENABLED)
+    # Networking disabled (e.g. Dreamcast): use the stub net layer
+    target_sources(dethrace_obj PRIVATE pc-all/nullnet.c)
 else()
     # dethrace-added cross platform sys and network implementation
     target_sources(dethrace_obj PRIVATE pc-all/allnet.c)

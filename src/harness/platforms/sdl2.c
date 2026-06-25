@@ -35,6 +35,12 @@ static struct {
 extern void QuitGame(void);
 extern br_pixelmap* gBack_screen;
 
+static void set_key_from_scancode(SDL_Scancode scancode, int down);
+#ifdef __DREAMCAST__
+static SDL_Joystick* gController;
+static void SDL2_Harness_HandleControllerEvent(const SDL_Event* event);
+#endif
+
 #ifdef DETHRACE_SDL_DYNAMIC
 #ifdef _WIN32
 static const char* const possible_locations[] = {
@@ -151,19 +157,21 @@ static void SDL2_Harness_ProcessWindowMessages(void) {
             }
 
             // Map incoming SDL scancode to PC scan code as used by game code
-            int dethrace_scancode = sdl_scancode_map[event.key.keysym.scancode];
-            if (dethrace_scancode == 0) {
+            if (sdl_scancode_map[event.key.keysym.scancode] == 0) {
                 LOG_WARN3("unexpected scan code %s (%d)", SDL2_GetScancodeName(event.key.keysym.scancode), event.key.keysym.scancode);
                 return;
             }
-
-            if (event.type == SDL_KEYDOWN) {
-                key_state[dethrace_scancode >> 5] |= (1 << (dethrace_scancode & 0x1F));
-            } else {
-                key_state[dethrace_scancode >> 5] &= ~(1 << (dethrace_scancode & 0x1F));
-            }
-            gKeyHandler_func();
+            set_key_from_scancode(event.key.keysym.scancode, event.type == SDL_KEYDOWN);
             break;
+
+#ifdef __DREAMCAST__
+        case SDL_JOYHATMOTION:
+        case SDL_JOYBUTTONDOWN:
+        case SDL_JOYBUTTONUP:
+        case SDL_JOYAXISMOTION:
+            SDL2_Harness_HandleControllerEvent(&event);
+            break;
+#endif
 
         case SDL_WINDOWEVENT:
             if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
@@ -176,6 +184,98 @@ static void SDL2_Harness_ProcessWindowMessages(void) {
         }
     }
 }
+
+// Apply a key state change expressed as an SDL scancode, translating it to the
+// PC scancode the game expects. Shared by the keyboard handler and (on the
+// Dreamcast) the controller-to-keyboard mapping.
+static void set_key_from_scancode(SDL_Scancode scancode, int down) {
+    int dethrace_scancode = sdl_scancode_map[scancode];
+    if (dethrace_scancode == 0) {
+        return;
+    }
+    if (down) {
+        key_state[dethrace_scancode >> 5] |= (1 << (dethrace_scancode & 0x1F));
+    } else {
+        key_state[dethrace_scancode >> 5] &= ~(1 << (dethrace_scancode & 0x1F));
+    }
+    if (gKeyHandler_func != NULL) {
+        gKeyHandler_func();
+    }
+}
+
+#ifdef __DREAMCAST__
+// Map the Dreamcast controller to the keyboard the game expects. The d-pad and
+// the analog stick both drive the arrow keys, so they work for menu navigation
+// and for steering and acceleration in game. Button indices follow the
+// KallistiOS SDL2 joystick driver; adjust the cases below if a pad reports
+// differently.
+#define DC_AXIS_DEADZONE 16000
+
+static void set_hat_direction(int active, int was_active, SDL_Scancode scancode) {
+    if (active != was_active) {
+        set_key_from_scancode(scancode, active);
+    }
+}
+
+static void SDL2_Harness_HandleControllerEvent(const SDL_Event* event) {
+    static int prev_hat = SDL_HAT_CENTERED;
+    static int axis_neg[8];
+    static int axis_pos[8];
+
+    switch (event->type) {
+    case SDL_JOYHATMOTION: {
+        int hat = event->jhat.value;
+        set_hat_direction(hat & SDL_HAT_UP, prev_hat & SDL_HAT_UP, SDL_SCANCODE_UP);
+        set_hat_direction(hat & SDL_HAT_DOWN, prev_hat & SDL_HAT_DOWN, SDL_SCANCODE_DOWN);
+        set_hat_direction(hat & SDL_HAT_LEFT, prev_hat & SDL_HAT_LEFT, SDL_SCANCODE_LEFT);
+        set_hat_direction(hat & SDL_HAT_RIGHT, prev_hat & SDL_HAT_RIGHT, SDL_SCANCODE_RIGHT);
+        prev_hat = hat;
+        break;
+    }
+    case SDL_JOYBUTTONDOWN:
+    case SDL_JOYBUTTONUP: {
+        int down = (event->type == SDL_JOYBUTTONDOWN);
+        SDL_Scancode sc;
+        switch (event->jbutton.button) {
+        case 0: sc = SDL_SCANCODE_RETURN; break; // A: select
+        case 1: sc = SDL_SCANCODE_ESCAPE; break; // B: back
+        case 2: sc = SDL_SCANCODE_SPACE; break;  // X: handbrake
+        case 3: sc = SDL_SCANCODE_TAB; break;    // Y
+        default: sc = SDL_SCANCODE_RETURN; break; // Start and others: select
+        }
+        set_key_from_scancode(sc, down);
+        break;
+    }
+    case SDL_JOYAXISMOTION: {
+        int axis = event->jaxis.axis;
+        if (axis < 0 || axis >= 8) {
+            break;
+        }
+        SDL_Scancode neg, pos;
+        if (axis == 0) {
+            neg = SDL_SCANCODE_LEFT;
+            pos = SDL_SCANCODE_RIGHT;
+        } else if (axis == 1) {
+            neg = SDL_SCANCODE_UP;
+            pos = SDL_SCANCODE_DOWN;
+        } else {
+            break;
+        }
+        int want_neg = event->jaxis.value < -DC_AXIS_DEADZONE;
+        int want_pos = event->jaxis.value > DC_AXIS_DEADZONE;
+        if (want_neg != axis_neg[axis]) {
+            set_key_from_scancode(neg, want_neg);
+            axis_neg[axis] = want_neg;
+        }
+        if (want_pos != axis_pos[axis]) {
+            set_key_from_scancode(pos, want_pos);
+            axis_pos[axis] = want_pos;
+        }
+        break;
+    }
+    }
+}
+#endif
 
 static void SDL2_Harness_SetKeyHandler(void (*handler_func)(void)) {
     gKeyHandler_func = handler_func;
@@ -261,6 +361,15 @@ static void SDL2_Harness_CreateWindow(const char* title, int width, int height, 
     if (SDL2_Init(SDL_INIT_VIDEO) != 0) {
         LOG_PANIC2("SDL_INIT_VIDEO error: %s", SDL2_GetError());
     }
+
+#ifdef __DREAMCAST__
+    // The Dreamcast has no keyboard by default, so open the controller and feed
+    // its input through the keyboard mapping above.
+    if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) == 0 && SDL_NumJoysticks() > 0) {
+        gController = SDL_JoystickOpen(0);
+        SDL_JoystickEventState(SDL_ENABLE);
+    }
+#endif
 
     extra_window_flags = SDL_WINDOW_RESIZABLE;
     if (harness_game_config.start_full_screen) {

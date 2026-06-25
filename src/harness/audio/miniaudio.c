@@ -13,9 +13,9 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio/miniaudio.h"
 
-// Must come after miniaudio.h
-#undef STB_VORBIS_HEADER_ONLY
-#include "stb/stb_vorbis.c"
+// The stb_vorbis implementation is compiled in its own translation unit
+// (stb_vorbis_impl.c) so it does not collide with platform headers pulled in by
+// miniaudio. Only the header (declarations) is needed here.
 
 #include <assert.h>
 #include <stdio.h>
@@ -25,7 +25,7 @@
 static int kMem_S3_DOS_SOS_channel = 234;
 
 typedef struct tMiniaudio_sample {
-    ma_audio_buffer_ref buffer_ref;
+    ma_audio_buffer buffer_ref;
     ma_sound sound;
     int init_volume;
     int init_pan;
@@ -58,7 +58,7 @@ tAudioBackend_error_code AudioBackend_Init(void) {
         printf("Failed to initialize audio engine.");
         return eAB_error;
     }
-    LOG_INFO2("Playback device: '%s'", engine.pDevice->playback.name);
+    LOG_INFO("Audio playback device initialized");
     ma_engine_set_volume(&engine, harness_game_config.volume_multiplier);
     ma_engine_initialized = 1;
 
@@ -151,14 +151,16 @@ tAudioBackend_error_code AudioBackend_PlaySample(void* type_struct_sample, int c
     miniaudio = (tMiniaudio_sample*)type_struct_sample;
     assert(miniaudio != NULL);
 
-    result = ma_audio_buffer_ref_init(ma_format_u8, channels, data, size / channels, &miniaudio->buffer_ref);
-    miniaudio->buffer_ref.sampleRate = rate;
+    ma_audio_buffer_config buffer_config = ma_audio_buffer_config_init(ma_format_u8, channels, rate, (ma_uint64)(size / channels), data, NULL);
+    // init (not init_and_copy_data) references the caller's buffer, matching the
+    // previous ma_audio_buffer_ref behaviour. The game keeps the sample alive.
+    result = ma_audio_buffer_init(&buffer_config, &miniaudio->buffer_ref);
     if (result != MA_SUCCESS) {
         return eAB_error;
     }
 
     flags = MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_NO_SPATIALIZATION;
-    result = ma_sound_init_from_data_source(&engine, &miniaudio->buffer_ref, flags, NULL, &miniaudio->sound);
+    result = ma_sound_init_from_data_source(&engine, &miniaudio->buffer_ref, flags, NULL, NULL, &miniaudio->sound);
     if (result != MA_SUCCESS) {
         return eAB_error;
     }
@@ -253,7 +255,7 @@ tAudioBackend_error_code AudioBackend_StopSample(void* type_struct_sample) {
     if (miniaudio->initialized) {
         ma_sound_stop(&miniaudio->sound);
         ma_sound_uninit(&miniaudio->sound);
-        ma_audio_buffer_ref_uninit(&miniaudio->buffer_ref);
+        ma_audio_buffer_uninit(&miniaudio->buffer_ref);
         miniaudio->initialized = 0;
     }
     return eAB_success;
@@ -298,7 +300,7 @@ tAudioBackend_stream* AudioBackend_StreamOpen(int bit_depth, int channels, unsig
         goto failed;
     }
 
-    if (ma_sound_init_from_data_source(&engine, &new->paged_audio_buffer, MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, &new->sound) != MA_SUCCESS) {
+    if (ma_sound_init_from_data_source(&engine, &new->paged_audio_buffer, MA_SOUND_FLAG_NO_PITCH | MA_SOUND_FLAG_NO_SPATIALIZATION, NULL, NULL, &new->sound) != MA_SUCCESS) {
         LOG_WARN("Failed to create sound from data source");
         goto failed;
     }

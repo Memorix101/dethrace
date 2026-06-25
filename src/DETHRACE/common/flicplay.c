@@ -15,6 +15,33 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Reentrant tokenizer. The original game uses strtok, whose global state is
+// corrupted when tokenizing happens in nested calls (one strtok loop calling a
+// function that itself tokenizes). That mis-parses and crashes on the
+// Dreamcast. dethrace_strtok_r keeps its state in a caller-supplied pointer, so
+// each function gets its own and nesting is safe.
+static char* dethrace_strtok_r(char* str, const char* delim, char** saveptr) {
+    char* token;
+    if (str == NULL) {
+        str = *saveptr;
+    }
+    str += strspn(str, delim);
+    if (*str == '\0') {
+        *saveptr = str;
+        return NULL;
+    }
+    token = str;
+    str = strpbrk(token, delim);
+    if (str == NULL) {
+        *saveptr = token + strlen(token);
+    } else {
+        *str = '\0';
+        *saveptr = str + 1;
+    }
+    return token;
+}
+
+
 // GLOBAL: CARM95 0x00514fa0
 int gPalette_allocate_count;
 
@@ -2046,6 +2073,7 @@ br_pixelmap* GetPanelPixelmap(int pIndex) {
 // IDA: void __cdecl LoadInterfaceStrings()
 // FUNCTION: CARM95 0x004981cf
 void LoadInterfaceStrings(void) {
+    char* _dr_saveptr;
     FILE* f;
     char s[256];
     char s2[256];
@@ -2070,9 +2098,9 @@ void LoadInterfaceStrings(void) {
         gTranslations = BrMemAllocate(gTranslation_count * sizeof(tTranslation_record), kMem_translations);
         for (i = 0; i < gTranslation_count; i++) {
             GetALineAndDontArgue(f, s);
-            str = strtok(s, "\t ,/");
+            str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
             strcpy(s2, str);
-            strtok(s2, ".");
+            dethrace_strtok_r(s2, ".", &_dr_saveptr);
             strcat(s2, ".FLI");
             gTranslations[i].flic_index = -1;
             for (j = 0; j < COUNT_OF(gMain_flic_list); j++) {
@@ -2085,14 +2113,14 @@ void LoadInterfaceStrings(void) {
                 FatalError(kFatalError_FindFlicUsedInTranslationFile_S, s2);
             }
             str[strlen(str)] = ',';
-            str = strtok(s, "\t ,/");
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &gTranslations[i].x);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &gTranslations[i].y);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &gTranslations[i].font_index);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%c", &ch);
             switch (ch) {
             case 'l':
@@ -2108,7 +2136,7 @@ void LoadInterfaceStrings(void) {
                 gTranslations[i].justification = eJust_centre;
                 break;
             }
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%c", &ch);
             gTranslations[i].global = ch == 'g' || ch == 'G';
             gTranslations[i].every_frame = strlen(str) > 1 && (str[1] == 'e' || str[1] == 'E');

@@ -1840,8 +1840,35 @@ void FlashyMapCheckpoint(int pIndex, tU32 pTime) {
 
 // IDA: int __usercall ConditionallyFillWithSky@<EAX>(br_pixelmap *pPixelmap@<EAX>)
 // FUNCTION: CARM95 0x004b784d
+#ifdef __DREAMCAST__
+// Palette index the PowerVR uses for the solid sky background behind the hardware
+// 3D. The original software sky (a yaw-scrolled horizon strip) is not reproduced
+// in hardware yet, so we pick a representative colour here each frame.
+int gDC_sky_index = 0;
+#endif
+
 int ConditionallyFillWithSky(br_pixelmap* pPixelmap) {
     int bgnd_col;
+
+#ifdef __DREAMCAST__
+    // The hardware renders the 3D; the 2D/HUD is composited in front of it using
+    // index 0 as the transparent key. Keep the 3D region of gBack_screen at index
+    // 0 (transparent) so the hardware 3D shows through, and record a sky colour
+    // for the PowerVR to paint as a solid background behind the 3D. Prefer the
+    // horizon texture's top pixel, else the flat sky / fog colour.
+    if (gHorizon_material != NULL && gHorizon_material->colour_map != NULL &&
+        gHorizon_material->colour_map->pixels != NULL) {
+        gDC_sky_index = ((br_uint_8*)gHorizon_material->colour_map->pixels)[0];
+    } else if (gProgram_state.current_depth_effect.type == eDepth_effect_fog || gSwap_depth_effect_type == eDepth_effect_fog) {
+        gDC_sky_index = 255;
+    } else if (gLast_camera_special_volume != NULL && gLast_camera_special_volume->sky_col >= 0) {
+        gDC_sky_index = gLast_camera_special_volume->sky_col;
+    } else {
+        gDC_sky_index = 0;
+    }
+    BrPixelmapFill(pPixelmap, 0);
+    return 1;
+#endif
 
     if (gProgram_state.current_depth_effect.sky_texture != NULL && (gLast_camera_special_volume == NULL || gLast_camera_special_volume->sky_col < 0)) {
         return 0;
@@ -1906,6 +1933,14 @@ void RenderAFrame(int pDepth_mask_on) {
 #endif
 
     the_time = GetTotalTime();
+#ifdef __DREAMCAST__
+    // The PowerVR draws the 3D scene directly, so BRender never fills the 3D
+    // region of gBack_screen. Any area the per-frame HUD does not redraw (the
+    // pratcam and panels disabled in low-memory mode, the screen border) would
+    // otherwise keep showing stale pixels from earlier screens, which read as
+    // white. Clear to black first; the sky fill, HUD and PowerVR 3D draw on top.
+    BrPixelmapFill(gBack_screen, 0);
+#endif
     old_pixels = gRender_screen->pixels;
     cockpit_on = gProgram_state.cockpit_on && gProgram_state.cockpit_image_index >= 0 && !gMap_mode;
     gMirror_on__graphics = gProgram_state.mirror_on && cockpit_on && gProgram_state.which_view == eView_forward;

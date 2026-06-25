@@ -1062,7 +1062,13 @@ int PDCheckDriveExists2(char* pThe_path, char* pFile_name, tU32 pMin_size) {
 // IDA: int __cdecl PDDoWeLeadAnAustereExistance()
 // FUNCTION: CARM95 0x004a856f
 int PDDoWeLeadAnAustereExistance(void) {
+#ifdef __DREAMCAST__
+    // The Dreamcast has 16 MB of RAM, so low memory mode is always required.
+    // This is a hard floor in case the ini did not enable it.
+    return 1;
+#else
     return 0;
+#endif
 }
 
 int CheckGorePasswordFile(char* pPassword) {

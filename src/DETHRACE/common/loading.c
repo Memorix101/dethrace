@@ -38,6 +38,33 @@
 #include "world.h"
 #include <errno.h>
 
+// Reentrant tokenizer. The original game uses strtok, whose global state is
+// corrupted when tokenizing happens in nested calls (one strtok loop calling a
+// function that itself tokenizes). That mis-parses and crashes on the
+// Dreamcast. dethrace_strtok_r keeps its state in a caller-supplied pointer, so
+// each function gets its own and nesting is safe.
+static char* dethrace_strtok_r(char* str, const char* delim, char** saveptr) {
+    char* token;
+    if (str == NULL) {
+        str = *saveptr;
+    }
+    str += strspn(str, delim);
+    if (*str == '\0') {
+        *saveptr = str;
+        return NULL;
+    }
+    token = str;
+    str = strpbrk(token, delim);
+    if (str == NULL) {
+        *saveptr = token + strlen(token);
+    } else {
+        *str = '\0';
+        *saveptr = str + 1;
+    }
+    return token;
+}
+
+
 #define HITHER_MULTIPLIER 2.0f
 #define AMBIENT_MULTIPLIER 0.01f
 #define NBR_FUNK_GROVE_FLAGS 30
@@ -397,6 +424,7 @@ void MemSkipBytes(char** pPtr, int pBytes_to_skip) {
 // IDA: void __cdecl LoadGeneralParameters()
 // FUNCTION: CARM95 0x0041c5ba
 void LoadGeneralParameters(void) {
+    char* _dr_saveptr;
     FILE* f;
     tPath_name the_path;
     int i;
@@ -486,44 +514,44 @@ void LoadGeneralParameters(void) {
     gOpponent_nastyness_frigger = GetAFloat(f);
     ParseSpecialVolume(f, &gDefault_default_water_spec_vol, gDef_def_water_screen_name);
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < 5; i++) {
         sscanf(str, "%d", &gInitial_net_credits[i]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     }
 
     gTag_start_time = 1000 * GetAnInt(f);
     gFox_start_time = 1000 * GetAnInt(f);
 
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < 7; i++) {
         sscanf(str, "%f", &gNet_repair_cost[i]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < 7; i++) {
         sscanf(str, "%f", &gNet_recovery_cost[i]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < 7; i++) {
         sscanf(str, "%f", &gNet_softness[i]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < 7; i++) {
         sscanf(str, "%f", &gNet_offensive[i]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < 7; i++) {
         sscanf(str, "%d", &gNet_target[i]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     }
 
     gMin_respawn_time = 1000 * GetAnInt(f);
@@ -1224,6 +1252,7 @@ void AdjustCarCoordinates(tCar_spec* pCar) {
 // IDA: void __usercall LoadSpeedo(FILE *pF@<EAX>, int pIndex@<EDX>, tCar_spec *pCar_spec@<EBX>)
 // FUNCTION: CARM95 0x00422d43
 void LoadSpeedo(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
+    char* _dr_saveptr;
     tPath_name the_path;
     char s[256];
     char* str;
@@ -1231,44 +1260,44 @@ void LoadSpeedo(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
     char the_char2;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%c", &the_char1);
     if (the_char1 == 'd') {
         pCar_spec->speedo_radius_2[pIndex] = -1;
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_x[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_y[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         pCar_spec->speedo_image[pIndex] = LoadPixelmap(str);
         if (!pCar_spec->speedo_image[pIndex]) {
             FatalError(kFatalError_LoadSpeedoImage);
         }
         pCar_spec->speedo_y_pitch[pIndex] = pCar_spec->speedo_image[pIndex]->height / 10;
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_x_pitch[pIndex]);
     } else {
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_x[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_y[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         pCar_spec->speedo_image[pIndex] = LoadPixelmap(str);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_centre_x[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_centre_y[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_radius_1[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_radius_2[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_start_angle[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_end_angle[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->speedo_needle_colour[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->max_speed);
     }
 }
@@ -1276,6 +1305,7 @@ void LoadSpeedo(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
 // IDA: void __usercall LoadTacho(FILE *pF@<EAX>, int pIndex@<EDX>, tCar_spec *pCar_spec@<EBX>)
 // FUNCTION: CARM95 0x004230de
 void LoadTacho(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
+    char* _dr_saveptr;
     tPath_name the_path;
     char s[256];
     char* str;
@@ -1283,36 +1313,36 @@ void LoadTacho(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
     char the_char2;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%c", &the_char1);
     if (the_char1 == 'd') {
         pCar_spec->tacho_radius_2[pIndex] = -1;
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->tacho_x[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->tacho_y[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         pCar_spec->tacho_image[pIndex] = LoadPixelmap(str);
     } else {
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->tacho_x[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->tacho_y[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         pCar_spec->tacho_image[pIndex] = LoadPixelmap(str);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->tacho_centre_x[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->tacho_centre_y[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->tacho_radius_1[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->tacho_radius_2[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->tacho_start_angle[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->tacho_end_angle[pIndex]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->tacho_needle_colour[pIndex]);
     }
 }
@@ -1320,6 +1350,7 @@ void LoadTacho(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
 // IDA: void __usercall LoadHeadups(FILE *pF@<EAX>, int pIndex@<EDX>, tCar_spec *pCar_spec@<EBX>)
 // FUNCTION: CARM95 0x004233d3
 void LoadHeadups(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
     int j;
@@ -1328,13 +1359,13 @@ void LoadHeadups(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
     number_of_slots = GetAnInt(pF);
     for (j = 0; j < number_of_slots; j++) {
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].x);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].y);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].colour);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         strcpy(s, str);
         switch (s[0]) {
         case 'l':
@@ -1350,15 +1381,15 @@ void LoadHeadups(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
         if (s[1] == 'c') {
             pCar_spec->headup_slots[pIndex][j].cockpit_anchored = 1;
         }
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].dim_left);
         if (pCar_spec->headup_slots[pIndex][j].dim_left >= 0) {
             pCar_spec->headup_slots[pIndex][j].dimmed_background = 1;
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].dim_top);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].dim_right);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->headup_slots[pIndex][j].dim_bottom);
         } else {
             pCar_spec->headup_slots[pIndex][j].dimmed_background = 0;
@@ -1609,16 +1640,17 @@ void ReadMechanicsData(FILE* pF, tCar_spec* c) {
 // IDA: void __usercall LoadGear(FILE *pF@<EAX>, int pIndex@<EDX>, tCar_spec *pCar_spec@<EBX>)
 // FUNCTION: CARM95 0x004237be
 void LoadGear(FILE* pF, int pIndex, tCar_spec* pCar_spec) {
+    char* _dr_saveptr;
     tPath_name the_path;
     char s[256];
     char* str;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", &pCar_spec->gear_x[pIndex]);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", &pCar_spec->gear_y[pIndex]);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     if (!pIndex) {
         pCar_spec->gears_image = LoadPixelmap(str);
     }
@@ -1636,6 +1668,7 @@ void AddRefOffset(int* pRef_holder) {
 // IDA: void __usercall GetDamageProgram(FILE *pF@<EAX>, tCar_spec *pCar_spec@<EDX>, tImpact_location pImpact_location@<EBX>)
 // FUNCTION: CARM95 0x0042389d
 void GetDamageProgram(FILE* pF, tCar_spec* pCar_spec, tImpact_location pImpact_location) {
+    char* _dr_saveptr;
     tDamage_clause* the_clause;
     int i;
     int j;
@@ -1655,7 +1688,7 @@ void GetDamageProgram(FILE* pF, tCar_spec* pCar_spec, tImpact_location pImpact_l
     for (i = 0, the_clause = pCar_spec->damage_programs[pImpact_location].clauses; i < count; i++, the_clause++) {
         the_clause->condition_count = 0;
         GetALineAndDontArgue(pF, s);
-        str = strtok(s, delim);
+        str = dethrace_strtok_r(s, delim, &_dr_saveptr);
         do {
             if (str[0] == 'x') {
                 the_clause->conditions[the_clause->condition_count].axis_comp = 0;
@@ -1675,14 +1708,14 @@ void GetDamageProgram(FILE* pF, tCar_spec* pCar_spec, tImpact_location pImpact_l
             }
             sscanf(str + 2, "%f", &the_clause->conditions[the_clause->condition_count].comparitor);
             the_clause->condition_count++;
-            str = strtok(NULL, delim);
+            str = dethrace_strtok_r(NULL, delim, &_dr_saveptr);
         } while (the_clause->condition_count < 2);
 
         the_clause->effect_count = GetAnInt(pF);
         for (j = 0; j < the_clause->effect_count; j++) {
             the_clause->effects[j].type = -1;
             GetALineAndDontArgue(pF, s);
-            str = strtok(s, "\t ,/");
+            str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
             for (k = 0; k < COUNT_OF(gDamage_names); k++) {
                 if (strcmp(str, gDamage_names[k]) == 0) {
                     the_clause->effects[j].type = k;
@@ -1692,7 +1725,7 @@ void GetDamageProgram(FILE* pF, tCar_spec* pCar_spec, tImpact_location pImpact_l
             if (the_clause->effects[j].type < 0) {
                 FatalError(kFatalError_UnknownDamageType_S, str);
             }
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%f", &the_clause->effects[j].weakness_factor);
         }
     }
@@ -1868,6 +1901,7 @@ void SetModelFlags(br_model* pModel, int pOwner) {
 // IDA: void __usercall LoadCar(char *pCar_name@<EAX>, tDriver pDriver@<EDX>, tCar_spec *pCar_spec@<EBX>, int pOwner@<ECX>, char *pDriver_name, tBrender_storage *pStorage_space)
 // FUNCTION: CARM95 0x00420144
 void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner, char* pDriver_name, tBrender_storage* pStorage_space) {
+    char* _dr_saveptr;
     FILE* f;
     FILE* g;
     FILE* h;
@@ -1986,7 +2020,7 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
     if (pDriver == eDriver_local_human) {
         for (j = 0; j < COUNT_OF(pCar_spec->cockpit_images); j++) {
             GetALineAndDontArgue(h, s);
-            str = strtok(s, "\t ,/");
+            str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
             if (!gAusterity_mode) {
                 the_image = LoadPixelmap(str);
                 if (the_image == NULL) {
@@ -2005,13 +2039,13 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
                 pCar_spec->cockpit_images[j] = NULL;
             }
             GetALineAndDontArgue(h, s);
-            str = strtok(s, "\t ,/");
+            str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->render_left[j]);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->render_top[j]);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->render_right[j]);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->render_bottom[j]);
             PossibleService();
         }
@@ -2037,21 +2071,21 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         }
         PossibleService();
         GetALineAndDontArgue(h, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->number_of_hands_images);
         for (j = 0; j < pCar_spec->number_of_hands_images; j++) {
             GetALineAndDontArgue(h, s);
-            str = strtok(s, "\t ,/");
+            str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->lhands_x[j]);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->lhands_y[j]);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             pCar_spec->lhands_images[j] = LoadPixelmap(str);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->rhands_x[j]);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->rhands_y[j]);
-            str = strtok(NULL, "\t ,/");
+            str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
             if (!gAusterity_mode) {
                 pCar_spec->rhands_images[j] = LoadPixelmap(str);
             }
@@ -2059,68 +2093,68 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         }
         pCar_spec->red_line = 8000;
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         sscanf(str, "%f", &pCar_spec->driver_x_offset);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%f", &pCar_spec->driver_y_offset);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%f", &pCar_spec->driver_z_offset);
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         sscanf(str, "%f", &pCar_spec->head_left_angle);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%f", &pCar_spec->head_right_angle);
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         sscanf(str, "%f", &pCar_spec->mirror_x_offset);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%f", &pCar_spec->mirror_y_offset);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%f", &pCar_spec->mirror_z_offset);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%f", &pCar_spec->rearview_camera_angle);
         GetALineAndDontArgue(h, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->mirror_left);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->mirror_top);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->mirror_right);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->mirror_bottom);
         GetALineAndDontArgue(h, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->prat_left);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->prat_top);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->prat_right);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->prat_bottom);
         GetALineAndDontArgue(f, s);
         PossibleService();
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         pCar_spec->prat_cam_left = LoadPixelmap(str);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         pCar_spec->prat_cam_top = LoadPixelmap(str);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         pCar_spec->prat_cam_right = LoadPixelmap(str);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         pCar_spec->prat_cam_bottom = LoadPixelmap(str);
         PossibleService();
         for (j = 0; j < COUNT_OF(pCar_spec->damage_units); ++j) {
             if (j != eDamage_driver) {
                 GetALineAndDontArgue(h, s);
-                str = strtok(s, "\t ,/");
+                str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
                 sscanf(str, "%d", &pCar_spec->damage_units[j].x_coord);
-                str = strtok(NULL, "\t ,/");
+                str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                 sscanf(str, "%d", &pCar_spec->damage_units[j].y_coord);
                 for (k = 0; k < COUNT_OF(pCar_spec->damage_units[j].periods); k++) {
-                    str = strtok(NULL, "\t ,/");
+                    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                     sscanf(str, "%f", &rate);
                     pCar_spec->damage_units[j].periods[k] = 1000.0 / rate / 2.0;
                 }
-                str = strtok(NULL, "\t ,/");
+                str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                 pCar_spec->damage_units[j].images = LoadPixelmap(str);
                 if (pCar_spec->damage_units[j].images == NULL) {
                     FatalError(kFatalError_LoadDamageImage);
@@ -2132,15 +2166,15 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
             PossibleService();
         }
         GetALineAndDontArgue(h, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->damage_x_offset);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->damage_y_offset);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->damage_background_x);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->damage_background_y);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         pCar_spec->damage_background = LoadPixelmap(str);
 
         pCar_spec->dim_count[0] = GetAnInt(h);
@@ -2171,17 +2205,17 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         }
         for (i = 0; i < COUNT_OF(pCar_spec->power_ups); ++i) {
             GetALineAndDontArgue(g, s);
-            str = strtok(s, "\t ,/");
+            str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
             sscanf(str, "%d", &pCar_spec->power_ups[i].number_of_parts);
             for (j = 0; j < pCar_spec->power_ups[i].number_of_parts; j++) {
                 GetALineAndDontArgue(g, s);
-                str = strtok(s, "\t ,/");
+                str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
                 sscanf(str, "%d", &pCar_spec->power_ups[i].info[j].rank_required);
-                str = strtok(NULL, "\t ,/");
+                str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                 strcpy(pCar_spec->power_ups[i].info[j].part_name, str);
                 pCar_spec->power_ups[i].info[j].data_ptr = NULL;
                 for (k = 0; k < COUNT_OF(pCar_spec->power_ups[i].info[j].prices); k++) {
-                    str = strtok(NULL, "\t ,/");
+                    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
                     sscanf(str, "%d", &pCar_spec->power_ups[i].info[j].prices[k]);
                 }
             }
@@ -2213,11 +2247,11 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
     GetDamageProgram(f, pCar_spec, eImpact_front);
     GetDamageProgram(f, pCar_spec, eImpact_back);
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     strcpy(pCar_spec->grid_icon_names[0], str);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     strcpy(pCar_spec->grid_icon_names[1], str);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     strcpy(pCar_spec->grid_icon_names[2], str);
     pCar_spec->grid_icon_image = NULL;
     if (gAusterity_mode) {
@@ -2287,13 +2321,13 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         BrActorAdd(gNon_track_actor, pCar_spec->car_master_actor);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", &pCar_spec->car_actor_count);
     pCar_spec->principal_car_actor = 0;
     for (i = 0; i < pCar_spec->car_actor_count; i++) {
         PossibleService();
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         sscanf(str, "%f", &temp_float);
         if (temp_float < 0.f && pDriver != eDriver_local_human) {
             FreeUpBonnetModels(pStorage_space->models + old_model_count, pStorage_space->models_count - old_model_count);
@@ -2305,7 +2339,7 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         } else {
             pCar_spec->car_model_actors[i].min_distance_squared = temp_float * temp_float;
         }
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
         PathCat(the_path, gApplication_path, "ACTORS");
         PathCat(the_path, the_path, str);
         pCar_spec->car_model_actors[i].actor = BrActorLoad(the_path);
@@ -2345,42 +2379,42 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
         MungeWindscreen(pCar_spec->car_model_actors[pCar_spec->principal_car_actor].actor->model);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", &pCar_spec->number_of_steerable_wheels);
     for (i = 0; i < pCar_spec->number_of_steerable_wheels; i++) {
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         sscanf(str, "%d", &pCar_spec->steering_ref[i]);
         AddRefOffset(&pCar_spec->steering_ref[i]);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < COUNT_OF(pCar_spec->lf_sus_ref); i++) {
         sscanf(str, "%d", &pCar_spec->lf_sus_ref[i]);
         AddRefOffset(&pCar_spec->lf_sus_ref[i]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     }
     PossibleService();
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < COUNT_OF(pCar_spec->rf_sus_ref); i++) {
         sscanf(str, "%d", &pCar_spec->rf_sus_ref[i]);
         AddRefOffset(&pCar_spec->rf_sus_ref[i]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < COUNT_OF(pCar_spec->lr_sus_ref); i++) {
         sscanf(str, "%d", &pCar_spec->lr_sus_ref[i]);
         AddRefOffset(&pCar_spec->lr_sus_ref[i]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < COUNT_OF(pCar_spec->rr_sus_ref); i++) {
         sscanf(str, "%d", &pCar_spec->rr_sus_ref[i]);
         AddRefOffset(&pCar_spec->rr_sus_ref[i]);
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     }
     GetFourInts(
         f,
@@ -2404,11 +2438,11 @@ void LoadCar(char* pCar_name, tDriver pDriver, tCar_spec* pCar_spec, int pOwner,
     AddRefOffset(&pCar_spec->non_driven_wheels_spin_ref_3);
     AddRefOffset(&pCar_spec->non_driven_wheels_spin_ref_4);
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", &temp_float);
     pCar_spec->driven_wheels_circum = temp_float * 2.f * DR_PI;
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", &temp_float);
     pCar_spec->non_driven_wheels_circum = temp_float * 2.f * DR_PI;
     pCar_spec->car_model_variable = pDriver != eDriver_local_human;
@@ -2714,6 +2748,7 @@ void LoadOpponentGridIcon(tRace_info* pRace_info, int pIndex) {
 // IDA: void __usercall LoadRaceInfo(int pRace_index@<EAX>, tRace_info *pRace_info@<EDX>)
 // FUNCTION: CARM95 0x0042466e
 void LoadRaceInfo(int pRace_index, tRace_info* pRace_info) {
+    char* _dr_saveptr;
     FILE* f;
     int i;
     int j;
@@ -2741,7 +2776,7 @@ void LoadRaceInfo(int pRace_index, tRace_info* pRace_info) {
     pRace_info->best_rank = gRace_list[pRace_index].best_rank;
     pRace_info->suggested_rank = gRace_list[pRace_index].suggested_rank;
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     pRace_info->scene_image_data = NULL;
     pRace_info->map_image_data = NULL;
     pRace_info->info_image_data = NULL;
@@ -2750,11 +2785,11 @@ void LoadRaceInfo(int pRace_index, tRace_info* pRace_info) {
         if (!LoadFlicData(str, &pRace_info->scene_image_data, &pRace_info->scene_image_data_length)) {
             FatalError(kFatalError_LoadRaceSceneImage);
         }
-        str = strtok(0, "\t ,/");
+        str = dethrace_strtok_r(0, "\t ,/", &_dr_saveptr);
         if (!LoadFlicData(str, &pRace_info->map_image_data, &pRace_info->map_image_data_length)) {
             FatalError(kFatalError_LoadRaceMapImage);
         }
-        str = strtok(0, "\t ,/");
+        str = dethrace_strtok_r(0, "\t ,/", &_dr_saveptr);
         if (!LoadFlicData(str, &pRace_info->info_image_data, &pRace_info->info_image_data_length)) {
             FatalError(kFatalError_loadRaceInfoImage);
         }
@@ -2764,7 +2799,7 @@ void LoadRaceInfo(int pRace_index, tRace_info* pRace_info) {
         }
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     strcpy(pRace_info->track_file_name, str);
     pRace_info->text_chunk_count = GetAnInt(f);
     pRace_info->text_chunks = BrMemAllocate(sizeof(tText_chunk) * pRace_info->text_chunk_count, kMem_race_text_chunk);
@@ -2852,6 +2887,7 @@ void DisposeGridIcons(tRace_info* pRace_info) {
 // IDA: void __cdecl LoadOpponents()
 // FUNCTION: CARM95 0x00424d15
 void LoadOpponents(void) {
+    char* _dr_saveptr;
     FILE* f;
     tPath_name the_path;
     int i;
@@ -2867,7 +2903,7 @@ void LoadOpponents(void) {
         FatalError(kFatalError_OpenOpponentsFile);
     }
     GetALineAndDontArgue(f, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", &gNumber_of_racers);
     gOpponents = BrMemAllocate(sizeof(tOpponent) * gNumber_of_racers, kMem_oppo_array);
 
@@ -2884,7 +2920,7 @@ void LoadOpponents(void) {
         gOpponents[i].network_availability = GetALineAndInterpretCommand(f, gNet_avail_names, COUNT_OF(gNet_avail_names));
 
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         strcpy(gOpponents[i].mug_shot_name, str);
 
         gOpponents[i].mug_shot_image_data = NULL;
@@ -2892,10 +2928,10 @@ void LoadOpponents(void) {
         gOpponents[i].stolen_car_image_data = NULL;
 
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         strcpy(gOpponents[i].car_file_name, str);
         GetALineAndDontArgue(f, s);
-        str = strtok(s, "\t ,/");
+        str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
         strcpy(gOpponents[i].stolen_car_flic_name, str);
 
         gOpponents[i].text_chunk_count = GetAnInt(f);
@@ -3037,13 +3073,14 @@ void DisposeChromeFont(br_pixelmap* pThe_font) {
 // IDA: int __usercall GetALineAndInterpretCommand@<EAX>(FILE *pF@<EAX>, char **pString_list@<EDX>, int pCount@<EBX>)
 // FUNCTION: CARM95 0x004257b0
 int GetALineAndInterpretCommand(FILE* pF, char** pString_list, int pCount) {
+    char* _dr_saveptr;
     int i;
     char s[256];
     char* str;
 
     GetALineAndDontArgue(pF, s);
 
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < pCount; i++) {
         if (strcmp(str, pString_list[i]) == 0) {
             return i;
@@ -3055,12 +3092,13 @@ int GetALineAndInterpretCommand(FILE* pF, char** pString_list, int pCount) {
 // IDA: int __usercall GetAnInt@<EAX>(FILE *pF@<EAX>)
 // FUNCTION: CARM95 0x00425878
 int GetAnInt(FILE* pF) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
     int result;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", &result);
     return result;
 }
@@ -3068,24 +3106,26 @@ int GetAnInt(FILE* pF) {
 // IDA: float __usercall GetAFloat@<ST0>(FILE *pF@<EAX>)
 // FUNCTION: CARM95 0x004258d0
 float GetAFloat(FILE* pF) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
     float result;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", &result);
     return result;
 }
 
 // IDA: float __usercall GetAFloatPercent@<ST0>(FILE *pF@<EAX>)
 float GetAFloatPercent(FILE* pF) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
     float result;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", &result);
     return result / 100.f;
 }
@@ -3093,89 +3133,95 @@ float GetAFloatPercent(FILE* pF) {
 // IDA: void __usercall GetPairOfFloats(FILE *pF@<EAX>, float *pF1@<EDX>, float *pF2@<EBX>)
 // FUNCTION: CARM95 0x00425986
 void GetPairOfFloats(FILE* pF, float* pF1, float* pF2) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", pF1);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", pF2);
 }
 
 // IDA: void __usercall GetThreeFloats(FILE *pF@<EAX>, float *pF1@<EDX>, float *pF2@<EBX>, float *pF3@<ECX>)
 // FUNCTION: CARM95 0x004259fd
 void GetThreeFloats(FILE* pF, float* pF1, float* pF2, float* pF3) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", pF1);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", pF2);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", pF3);
 }
 
 // IDA: void __usercall GetPairOfInts(FILE *pF@<EAX>, int *pF1@<EDX>, int *pF2@<EBX>)
 // FUNCTION: CARM95 0x00425a9b
 void GetPairOfInts(FILE* pF, int* pF1, int* pF2) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF1);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF2);
 }
 
 // IDA: void __usercall GetThreeInts(FILE *pF@<EAX>, int *pF1@<EDX>, int *pF2@<EBX>, int *pF3@<ECX>)
 // FUNCTION: CARM95 0x00425b12
 void GetThreeInts(FILE* pF, int* pF1, int* pF2, int* pF3) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF1);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF2);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF3);
 }
 
 // IDA: void __usercall GetThreeIntsAndAString(FILE *pF@<EAX>, int *pF1@<EDX>, int *pF2@<EBX>, int *pF3@<ECX>, char *pS)
 void GetThreeIntsAndAString(FILE* pF, int* pF1, int* pF2, int* pF3, char* pS) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF1);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF2);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF3);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     strcpy(pS, str);
 }
 
 // IDA: void __usercall GetFourInts(FILE *pF@<EAX>, int *pF1@<EDX>, int *pF2@<EBX>, int *pF3@<ECX>, int *pF4)
 // FUNCTION: CARM95 0x00425c85
 void GetFourInts(FILE* pF, int* pF1, int* pF2, int* pF3, int* pF4) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF1);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF2);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF3);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%d", pF4);
 }
 
@@ -3201,6 +3247,7 @@ void GetThreeScalars(FILE* pF, br_scalar* pS1, br_scalar* pS2, br_scalar* pS3) {
 // IDA: void __usercall GetFourScalars(FILE *pF@<EAX>, br_scalar *pF1@<EDX>, br_scalar *pF2@<EBX>, br_scalar *pF3@<ECX>, br_scalar *pF4)
 // FUNCTION: CARM95 0x00425dd6
 void GetFourScalars(FILE* pF, br_scalar* pF1, br_scalar* pF2, br_scalar* pF3, br_scalar* pF4) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
     float f1;
@@ -3209,13 +3256,13 @@ void GetFourScalars(FILE* pF, br_scalar* pF1, br_scalar* pF2, br_scalar* pF3, br
     float f4;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", &f1);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", &f2);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", &f3);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", &f4);
     *pF1 = f1;
     *pF2 = f2;
@@ -3238,30 +3285,32 @@ void GetFiveScalars(FILE* pF, br_scalar* pF1, br_scalar* pF2, br_scalar* pF3, br
 // IDA: void __usercall GetNScalars(FILE *pF@<EAX>, int pNumber@<EDX>, br_scalar *pScalars@<EBX>)
 // FUNCTION: CARM95 0x00425fdb
 void GetNScalars(FILE* pF, int pNumber, br_scalar* pScalars) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
     float fleurting_point_numero;
     int i;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     for (i = 0; i < pNumber; i++) {
         sscanf(str, "%f", &fleurting_point_numero);
         pScalars[i] = fleurting_point_numero;
-        str = strtok(NULL, "\t ,/");
+        str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     }
 }
 
 // IDA: void __usercall GetPairOfFloatPercents(FILE *pF@<EAX>, float *pF1@<EDX>, float *pF2@<EBX>)
 // FUNCTION: CARM95 0x0042607b
 void GetPairOfFloatPercents(FILE* pF, float* pF1, float* pF2) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", pF1);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", pF2);
     *pF1 = *pF1 / 100.0f;
     *pF2 = *pF2 / 100.0f;
@@ -3270,15 +3319,16 @@ void GetPairOfFloatPercents(FILE* pF, float* pF1, float* pF2) {
 // IDA: void __usercall GetThreeFloatPercents(FILE *pF@<EAX>, float *pF1@<EDX>, float *pF2@<EBX>, float *pF3@<ECX>)
 // FUNCTION: CARM95 0x00426112
 void GetThreeFloatPercents(FILE* pF, float* pF1, float* pF2, float* pF3) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", pF1);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", pF2);
-    str = strtok(NULL, "\t ,/");
+    str = dethrace_strtok_r(NULL, "\t ,/", &_dr_saveptr);
     sscanf(str, "%f", pF3);
     *pF1 = *pF1 / 100.0f;
     *pF2 = *pF2 / 100.0f;
@@ -3288,11 +3338,12 @@ void GetThreeFloatPercents(FILE* pF, float* pF1, float* pF2, float* pF3) {
 // IDA: void __usercall GetAString(FILE *pF@<EAX>, char *pString@<EDX>)
 // FUNCTION: CARM95 0x004261e0
 void GetAString(FILE* pF, char* pString) {
+    char* _dr_saveptr;
     char s[256];
     char* str;
 
     GetALineAndDontArgue(pF, s);
-    str = strtok(s, "\t ,/");
+    str = dethrace_strtok_r(s, "\t ,/", &_dr_saveptr);
     strcpy(pString, str);
 }
 
@@ -3795,6 +3846,7 @@ int SaveOptions(void) {
 // IDA: int __cdecl RestoreOptions()
 // FUNCTION: CARM95 0x004278be
 int RestoreOptions(void) {
+    char* _dr_saveptr;
     tPath_name the_path;
     FILE* f;
     char line[80];
@@ -3850,7 +3902,7 @@ int RestoreOptions(void) {
                 gMap_render_height = arg;
             } else if (!strcmp(token, "PlayerName")) {
                 fgets(line, 80, f);
-                s = strtok(line, "\n\r");
+                s = dethrace_strtok_r(line, "\n\r", &_dr_saveptr);
                 strcpy(gProgram_state.player_name[(int)arg], s);
             } else if (!strcmp(token, "EVolume")) {
                 gProgram_state.effects_volume = (int)arg;
@@ -3881,7 +3933,7 @@ int RestoreOptions(void) {
 #endif
             else if (!strcmp(token, "NetName")) {
                 fgets(line, 80, f);
-                s = strtok(line, "\n\r");
+                s = dethrace_strtok_r(line, "\n\r", &_dr_saveptr);
                 strcpy(gNet_player_name, s);
             } else if (!strcmp(token, "NETGAMETYPE")) {
                 gLast_game_type = (tNet_game_type)arg;

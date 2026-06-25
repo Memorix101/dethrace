@@ -48,6 +48,29 @@ option(DETHRACE_PLATFORM_SDL3 "Support SDL 3 platform driver" OFF)
 
 option(MSVC_42_FOR_RECCMP "Build with MSVC 4.2 to match assembly" OFF)
 
+# Dreamcast (KallistiOS) target. Driven by -D__DREAMCAST__=1 on the cmake line.
+# Force the platform/feature options that are valid on the console: a single
+# statically linked SDL2 backend, no networking, and no 3dfx OpenGL renderer
+# (glrend needs OpenGL 3, which the Dreamcast does not have).
+if(__DREAMCAST__)
+    set(DETHRACE_PLATFORM_SDL1 OFF)
+    set(DETHRACE_PLATFORM_SDL2 ON)
+    set(DETHRACE_PLATFORM_SDL3 OFF)
+    set(DETHRACE_PLATFORM_SDL_DYNAMIC OFF)
+    set(DETHRACE_NET_ENABLED OFF)
+    set(BRENDER_BUILD_EXAMPLES OFF)
+    set(BRENDER_BUILD_TOOLS OFF)
+    set(BRENDER_INSTALL OFF)
+    # KallistiOS has no libdl. CMAKE_DL_LIBS defaults to "dl", which BRender's
+    # host library links. Clear it so the link succeeds.
+    set(CMAKE_DL_LIBS "")
+    # This is reverse-engineered code with heavy type punning and relies on
+    # wrap-around signed arithmetic. At -O2 the optimizer's strict-aliasing and
+    # signed-overflow assumptions miscompile it (notably the collision/physics
+    # math), so disable them. Applies to all targets defined below.
+    add_compile_options(-fno-strict-aliasing -fwrapv)
+endif()
+
 if(MSVC_42_FOR_RECCMP)
     set(DETHRACE_FIX_BUGS OFF)
     set(DETHRACE_3DFX_PATCH OFF)

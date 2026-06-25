@@ -12,6 +12,33 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Reentrant tokenizer. The original game uses strtok, whose global state is
+// corrupted when tokenizing happens in nested calls (one strtok loop calling a
+// function that itself tokenizes). That mis-parses and crashes on the
+// Dreamcast. dethrace_strtok_r keeps its state in a caller-supplied pointer, so
+// each function gets its own and nesting is safe.
+static char* dethrace_strtok_r(char* str, const char* delim, char** saveptr) {
+    char* token;
+    if (str == NULL) {
+        str = *saveptr;
+    }
+    str += strspn(str, delim);
+    if (*str == '\0') {
+        *saveptr = str;
+        return NULL;
+    }
+    token = str;
+    str = strpbrk(token, delim);
+    if (str == NULL) {
+        *saveptr = token + strlen(token);
+    } else {
+        *str = '\0';
+        *saveptr = str + 1;
+    }
+    return token;
+}
+
+
 // GLOBAL: CARM95 0x00530190
 tSkid gSkids[100];
 
@@ -43,6 +70,7 @@ br_material* MaterialFromIndex(int pIndex) {
 // IDA: void __cdecl InitSkids()
 // FUNCTION: CARM95 0x004010c8
 void InitSkids(void) {
+    char* _dr_saveptr;
     int skid;
     int mat;
     int sl;
@@ -60,9 +88,9 @@ void InitSkids(void) {
 #if defined(DETHRACE_FIX_BUGS)
             // Avoid modification of read-only data by strtok.
             strcpy(mat_name, gProgram_state.sausage_eater_mode ? gBoring_material_names[mat] : gMaterial_names[mat]);
-            str = strtok(mat_name, ".");
+            str = dethrace_strtok_r(mat_name, ".", &_dr_saveptr);
 #else
-            str = strtok(gProgram_state.sausage_eater_mode ? gBoring_material_names[mat] : gMaterial_names[mat], ".");
+            str = dethrace_strtok_r(gProgram_state.sausage_eater_mode ? gBoring_material_names[mat] : gMaterial_names[mat], ".", &_dr_saveptr);
 #endif
 
             sl = strlen(str);

@@ -19,14 +19,20 @@ extern br_uint_32 gI_am_cheating;
 extern int gSound_override;
 extern int gSausage_override;
 extern int gGraf_spec_index;
+extern int gAustere_override;
 
 extern void Harness_Platform_Init(tHarness_platform* platform);
 
 extern const tPlatform_bootstrap SDL1_bootstrap;
 extern const tPlatform_bootstrap SDL2_bootstrap;
 extern const tPlatform_bootstrap SDL3_bootstrap;
+extern const tPlatform_bootstrap DCPVR_bootstrap;
 
 static const tPlatform_bootstrap* platform_bootstraps[] = {
+#if defined(DETHRACE_PLATFORM_DCPVR)
+    &DCPVR_bootstrap,
+#define HAS_PLATFORM_BOOTSTRAP
+#endif
 #if defined(DETHRACE_PLATFORM_SDL3)
     &SDL3_bootstrap,
 #define HAS_PLATFORM_BOOTSTRAP
@@ -242,6 +248,17 @@ void Harness_DetectAndSetWorkingDirectory(char* argv0) {
     char* path;
     char* env_var;
     char pref_path[MAX_PATH];
+
+#ifdef __DREAMCAST__
+    // argv[0] is unreliable on the Dreamcast (CD boot), so do not touch it.
+    // Assets are at /cd (see the CD layout in docs/DREAMCAST_PORT.md).
+    (void)argv0;
+    printf("Using game directory: /cd\n");
+    if (chdir("/cd") != 0) {
+        LOG_PANIC2("Failed to chdir to /cd. Error is %s", strerror(errno));
+    }
+    return;
+#endif
 
     env_var = getenv("DETHRACE_ROOT_DIR");
 
@@ -508,6 +525,10 @@ static int Harness_Ini_Callback(void* user, const char* section, const char* nam
         gSausage_override = (value[0] == '1');
     } else if (MATCH("General", "Hires")) {
         gGraf_spec_index = (value[0] == '1');
+    } else if (MATCH("General", "LowMemory")) {
+        // Force low memory ("austere") mode, equivalent to the -lomem flag.
+        // Required on memory constrained targets such as the Dreamcast.
+        gAustere_override = (value[0] == '1');
     } else if (MATCH("General", "PhysicsPerFrame")) {
         harness_game_config.physics_per_frame = (value[0] == '1');
     }

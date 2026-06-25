@@ -23,6 +23,33 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Reentrant tokenizer. The original game uses strtok, whose global state is
+// corrupted when tokenizing happens in nested calls (one strtok loop calling a
+// function that itself tokenizes). That mis-parses and crashes on the
+// Dreamcast. dethrace_strtok_r keeps its state in a caller-supplied pointer, so
+// each function gets its own and nesting is safe.
+static char* dethrace_strtok_r(char* str, const char* delim, char** saveptr) {
+    char* token;
+    if (str == NULL) {
+        str = *saveptr;
+    }
+    str += strspn(str, delim);
+    if (*str == '\0') {
+        *saveptr = str;
+        return NULL;
+    }
+    token = str;
+    str = strpbrk(token, delim);
+    if (str == NULL) {
+        *saveptr = token + strlen(token);
+    } else {
+        *str = '\0';
+        *saveptr = str + 1;
+    }
+    return token;
+}
+
+
 // GLOBAL: CARM95 0x0050ba98
 tGot_proc* gGot_procs[34] = {
     GotCredits,
@@ -224,6 +251,7 @@ void LoseAllSimilarPowerups(tPowerup* pThe_powerup) {
 // IDA: int __usercall GotPowerupX@<EAX>(tCar_spec *pCar@<EAX>, int pIndex@<EDX>, int pTell_net_players@<EBX>, int pDisplay_headup@<ECX>, tU32 pTime_left)
 // FUNCTION: CARM95 0x0042ca60
 int GotPowerupX(tCar_spec* pCar, int pIndex, int pTell_net_players, int pDisplay_headup, tU32 pTime_left) {
+    char* _dr_saveptr;
     tPowerup* the_powerup;
     int i;
     int original_index;
@@ -260,9 +288,9 @@ int GotPowerupX(tCar_spec* pCar, int pIndex, int pTell_net_players, int pDisplay
         s2 = s;
         strcpy(s2, the_powerup->message);
         if (the_powerup->got_proc == FreezeTimer) {
-            s2 = strtok(s, "/");
+            s2 = dethrace_strtok_r(s, "/", &_dr_saveptr);
             if (gFreeze_timer) {
-                s2 = strtok(NULL, "/");
+                s2 = dethrace_strtok_r(NULL, "/", &_dr_saveptr);
             }
         }
         NewTextHeadupSlot(eHeadupSlot_misc, 0, 3000, -kFont_MEDIUMHD, s2);

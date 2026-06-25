@@ -1,6 +1,12 @@
 /build*
+*.cdi
+/tools/mkdcdisc
 .DS_Store
 .vscode
 reccmp-user.yml
 reccmp-build.yml
 reccmp-report*
+
+tools/carmdemo/
+
+tools/carmdemox/

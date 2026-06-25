@@ -1,9 +1,9 @@
 
+#include <stdio.h>
 #include <stdlib.h>
 
 #ifdef _WIN32
 #include <io.h>
-#include <stdio.h>
 #include <windows.h>
 #endif
 
@@ -32,6 +32,13 @@ void BR_CALLBACK _BrEndHook(void) {
 
 int main(int argc, char* argv[]) {
     int result;
+
+#ifdef __DREAMCAST__
+    // Keep stdout/stderr unbuffered so the last log line before any crash is
+    // not lost. Helps diagnosing bring-up issues over the dc-load console.
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+#endif
 
 #ifdef _WIN32
 #if _MSC_VER != 1020
