@@ -33,7 +33,7 @@ apt-get install libsdl2-dev cmake
 Dethrace uses [git submodules](https://git-scm.com/book/en/v2/Git-Tools-Submodules), so we must pull them after the inital clone:
 
 ```sh
-git clone https://github.com/dethrace-labs/dethrace
+git clone -b pvr https://github.com/Memorix101/dethrace
 cd dethrace
 git submodule update --init --recursive
 ```
