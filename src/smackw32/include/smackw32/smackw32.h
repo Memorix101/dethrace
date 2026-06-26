@@ -55,3 +55,7 @@ int SmackDoFrame(Smack* smack);
 void SmackNextFrame(Smack* smack);
 int SmackWait(Smack* smack);
 void SmackClose(Smack* smack);
+
+#ifdef __DREAMCAST__
+int DCSmackHasIdleBudget(Smack* smack);
+#endif

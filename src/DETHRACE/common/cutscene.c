@@ -15,6 +15,7 @@
 #include "smackw32/smackw32.h"
 #include "sound.h"
 #include "utility.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -114,6 +115,49 @@ void PlaySmackerFile(char* pSmack_name) {
                 SmackDoFrame(smk);
                 if (i != smk->Frames) {
                     SmackNextFrame(smk);
+#ifdef __DREAMCAST__
+                    // Decode time scales with how visually busy a frame is
+                    // (more on-screen motion/detail compresses to more
+                    // bytes, which takes proportionally longer for the SH4
+                    // to decompress - confirmed directly correlated via
+                    // [smk-render-diag] chunk_size vs render time). During a
+                    // busy stretch, decode alone can exceed the per-frame
+                    // time budget, which starves the Smacker audio stream
+                    // (see dc_smacker_stream.c) since it's fed once per
+                    // decoded frame. Rather than try to outrun the decoder,
+                    // use any idle time left in THIS frame's slot - time
+                    // that would otherwise just be spent sleeping/polling
+                    // below - to decode (and push audio for) further frames
+                    // too, displaying only the last one. This trades an
+                    // occasional skipped video frame (during busy moments
+                    // only - calm stretches finish well within budget and
+                    // skip nothing) for a deeper audio cushion built up
+                    // ahead of those busy moments. Capped so a sustained
+                    // slow patch can't make the video skip unboundedly.
+                    {
+                        const int max_decode_ahead = 4;
+                        int extra = 0;
+                        // Temporary diagnostic: confirm whether this is
+                        // actually engaging, and how much idle budget it
+                        // thinks it sees, before trusting its effect on
+                        // audio underrun rate.
+                        static unsigned long g_diag_total_extra = 0;
+                        static unsigned long g_diag_iterations = 0;
+                        unsigned int _diag_now = gHarness_platform.GetTicks();
+                        g_diag_iterations++;
+                        while (extra < max_decode_ahead && (i + extra + 1) != smk->Frames && DCSmackHasIdleBudget(smk)) {
+                            SmackDoFrame(smk);
+                            SmackNextFrame(smk);
+                            extra++;
+                        }
+                        g_diag_total_extra += (unsigned long)extra;
+                        if ((g_diag_iterations % 30) == 0 || extra > 0) {
+                            fprintf(stderr, "[decode-ahead-diag] iter=%lu now=%u extra=%d total_extra=%lu i=%d\n",
+                                g_diag_iterations, _diag_now, extra, g_diag_total_extra, i);
+                        }
+                        i += extra;
+                    }
+#endif
                 }
                 PDScreenBufferSwap(0);
 

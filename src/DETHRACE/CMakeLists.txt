@@ -63,6 +63,12 @@ if(MINGW)
     target_compile_options(dethrace_obj PRIVATE -Wno-error=incompatible-pointer-types)
 endif()
 
+set_source_files_properties(
+    ${OPTIMIZED_FILES}
+    PROPERTIES COMPILE_FLAGS "-fno-builtin -fno-lto -fno-fast-math"
+)
+
+
 if(__DREAMCAST__)
 
 set(COMMON_COMPILE_FLAGS

@@ -38,7 +38,7 @@
 #define DC_FEAT_MIPMAP 0
 #define DC_FEAT_ZBIAS 0
 #define DC_FEAT_FOG 0
-#define DC_FEAT_EVICT 0
+#define DC_FEAT_EVICT 1
 #define DC_FEAT_BILINEAR 0
 #define DC_FEAT_STALECHECK 0
 
@@ -927,14 +927,9 @@ static void DCPVR_Swap(br_pixelmap* back_buffer) {
                 (gRender_screen != NULL) ? gRender_screen->base_y : -1,
                 (gRender_screen != NULL) ? gRender_screen->width : -1,
                 (gRender_screen != NULL) ? gRender_screen->height : -1);*/
-            printf("[dcpvr] fps=%d tris=%d tex=%d notex=%d texfail=%d nullps=%d nullbuf=%d wrongtype=%d lasttype=%d horizon_run=%d horizon_skip=%d sky_index=%d sky_argb=%08x degenw=%d evict=%d minw=%g stale=%d minI=%g maxI=%g iscale=[%g,%g] ioffset=[%g,%g]\n",
-                fps, g3d_last_submitted, g3d_tex_count, g3d_diag_notex, g3d_diag_texfail,
-                g3d_diag_nullps, g3d_diag_nullbuf, g3d_diag_wrongtype, g3d_diag_lasttype,
-                g3d_diag_dohorizon_run, g3d_diag_dohorizon_skip, gDC_sky_index,
-                (unsigned int)DCPVR3D_PaletteColor(gDC_sky_index), g3d_diag_degenw, g3d_diag_evictions,
-                (double)g3d_diag_minw, g3d_diag_stale_tex, (double)g3d_diag_minI, (double)g3d_diag_maxI,
-                (double)g3d_diag_iscale_min, (double)g3d_diag_iscale_max,
-                (double)g3d_diag_ioffset_min, (double)g3d_diag_ioffset_max);
+            /*printf("[dcpvr] fps=%d tris=%d tex=%d/%d notex=%d texfail=%d evict=%d stale=%d\n",
+                fps, g3d_last_submitted, g3d_tex_count, DC3D_MAX_TEX, g3d_diag_notex, g3d_diag_texfail,
+                g3d_diag_evictions, g3d_diag_stale_tex);*/
             g3d_diag_notex = 0;
             g3d_diag_texfail = 0;
             g3d_diag_nullps = 0;

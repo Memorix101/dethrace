@@ -39,7 +39,83 @@ Notes:
   (`ma_audio_buffer` replaces the removed `ma_audio_buffer_ref`, the extra
   `ma_sound_notifications` argument, etc). stb_vorbis is built in its own
   translation unit and reuses KOS's native integer types to avoid a typedef
-  clash with `<arch/types.h>`.
+  clash with `<arch/types.h>`. Smacker cutscene audio is the one exception -
+  see "Smacker cutscene audio" below.
+
+## Smacker cutscene audio
+
+SFX, CD audio and in-game OGG music all go through `miniaudio.c` on every
+platform, including Dreamcast. Smacker (`.smk`) cutscene audio does not: on
+Dreamcast it talks directly to KOS's native streaming API
+(`dc/sound/stream.h`) through a small ring buffer in
+`src/harness/audio/dc_smacker_stream.c`, implementing just the
+`AudioBackend_StreamOpen/Write/Close` slice of `harness/audio.h`.
+
+Why a separate backend just for this one path: miniaudio's
+`ma_engine`/`ma_sound`/`ma_paged_audio_buffer` stack is built around finite,
+seekable sources (files) or fixed size buffers, not an indefinitely growing
+live PCM stream fed in small increments forever. A Smacker stream never
+seeks and is always exactly one sequential producer (decode) and one
+consumer (playback) on the same thread, so a plain ring buffer sidesteps an
+entire class of seek/cursor/restart bugs that stack isn't designed for.
+
+A few non-obvious things this backend has to get right:
+
+- **AICA channel collision.** miniaudio's Dreamcast backend hardcodes AICA
+  channels 0 and 1 for its own device, without ever registering them with
+  KOS's channel allocator (`snd_sfx_chn_alloc`). `snd_stream_alloc` (used for
+  the Smacker stream) *does* use that allocator, so without
+  intervention it would hand out the same channels 0/1, and the two systems
+  would fight over the same physical AICA channels. The fix is to call
+  `snd_sfx_chn_alloc()` twice and leak the result on first use, so the
+  allocator's next pick lands on 2/3 instead.
+- **PCM8 sign convention.** Smacker's 8 bit audio is unsigned (0..255,
+  centered on 128, the standard WAV convention), but the AICA's PCM8 channel
+  format is signed (-128..127). Feeding unsigned data straight to a
+  signed-expecting channel sounds like harsh clipping with the stereo image
+  appearing to jump between channels. Fix: XOR every 8 bit sample with 0x80
+  before writing it into the ring.
+- **Per-channel stream buffer size is a real tradeoff, not just bigger-is-safer.**
+  KOS's `snd_stream_poll()` asks the registered callback to refill in
+  half-buffer chunks whenever per-channel playback crosses into the other
+  half. That half must drain slower than `AudioBackend_StreamWrite`'s push
+  interval (once per decoded video frame, ~MSPerFrame apart) or the refill
+  check keeps landing in the trough between two pushes and failing even
+  though the ring isn't actually empty. But the *size* of that single
+  request also has to stay well below what the ring typically has resident,
+  or it reliably fails even with a healthy ring - going from a 4KB to a 16KB
+  per-channel buffer roughly tripled the underrun rate in testing, because
+  the ring (which typically holds a few KB) could no longer reliably supply
+  a 16KB ask in one shot. 4KB landed in the sweet spot for this content.
+- **Decode time scales with how visually busy a frame is.** More on-screen
+  motion/detail compresses to a bigger chunk, which takes the SH4
+  proportionally longer to decompress (confirmed directly: per-frame
+  decode time tracks chunk size almost exactly). During a busy stretch,
+  decode alone can exceed the per-frame time budget, which starves the
+  audio stream since it's fed once per decoded frame. This isn't a bug to
+  fix in the ring buffer - it's a genuine throughput ceiling. The mitigation
+  is in `PlaySmackerFile` (`src/DETHRACE/common/cutscene.c`): when a calm
+  frame's decode finishes well inside its time budget, the idle time that
+  would otherwise just be spent sleeping/polling is used to decode (and
+  push audio for) a few frames further ahead too, displaying only the last
+  one. This trades an occasional skipped video frame during busy moments
+  for a deeper audio cushion built up ahead of those moments, and is capped
+  (currently 4 frames) so a sustained slow patch can't make the video skip
+  unboundedly.
+
+Known open items, not yet resolved:
+- In-game OGG music has been reported to sound metallic/broken on real
+  hardware - not yet investigated (suspect sample rate handling, but
+  unconfirmed).
+- A startup "Out of memory" warning (tens of MB requested) has shown up in
+  logs; not yet correlated to a specific allocation or shown to cause real
+  problems.
+- Temporary diagnostic logging (`[dc-audio]`, `[smk-diag]`,
+  `[smk-disk-diag]`, `[smk-render-diag]`, `[decode-ahead-diag]`,
+  `[heap-diag]`) is still compiled into `dc_smacker_stream.c`,
+  `lib/libsmacker/smacker.c` and `cutscene.c` for ongoing tuning. Strip once
+  the underrun rate and the decode-ahead mitigation are both confirmed
+  good on hardware.
 
 ## Rendering strategy (the important part)
 
@@ -178,6 +254,11 @@ tools/mkdcdisc -e build-dc/dethrace.elf -D <demo> -f packaging/dreamcast/dethrac
     -o dethrace-dc.cdi -n "dethrace" -N
 ```
 
+# convert cdi to iso
+```sh
+mksdiso -h dethrace-dc.cdi
+```
+
 ## Low memory mode
 
 On 16 MB the game must run in low memory ("austere") mode. In game this is:
@@ -239,6 +320,8 @@ before we touch 3D hardware.
   `Renderer_SetPalette`, and controller to keyboard input. Goal: boots, menus
   navigable, software 3D (slow).
 - Phase 3: audio. Update vendored miniaudio to `dev-0.12`, AICA backend.
+  Smacker cutscene audio later moved to a native KOS streaming backend
+  instead - see "Smacker cutscene audio" above.
 - Phase 4: assets and packaging. The CDI build target.
 - Phase 5: memory. Profile the 16 MB budget, trim as needed.
 - Phase 6: the PowerVR triangle bridge described above. This is where the

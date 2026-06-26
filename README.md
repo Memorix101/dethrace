@@ -56,6 +56,12 @@ Once cmake has generated the build files for your platform, run the build. For e
 make
 ```
 
+### Dreamcast
+
+Dethrace also runs on the Sega Dreamcast via KallistiOS. See
+[docs/DREAMCAST_PORT.md](docs/DREAMCAST_PORT.md) for the build toolchain,
+architecture and known issues.
+
 ## Running the game
 
 Dethrace does not ship with any content. You'll need access to the data from the original game. If you don't have an original CD then you can [buy Carmageddon from GoG.com](https://www.gog.com/game/carmageddon_max_pack).

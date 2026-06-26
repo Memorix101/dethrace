@@ -62,6 +62,13 @@ target_sources(harness PRIVATE
 if(DETHRACE_SOUND_ENABLED)
     target_sources(harness PRIVATE audio/miniaudio.c audio/stb_vorbis_impl.c)
     target_link_libraries(harness PRIVATE miniaudio stb)
+    if(__DREAMCAST__)
+        # Smacker cutscene audio streams straight against KOS instead of
+        # through miniaudio's engine/sound/paged-buffer stack - see the
+        # comment at the top of dc_smacker_stream.c for why. SFX/CDA/music
+        # still go through miniaudio.c above on every platform.
+        target_sources(harness PRIVATE audio/dc_smacker_stream.c)
+    endif()
 else()
     target_sources(harness PRIVATE audio/null.c)
 endif()

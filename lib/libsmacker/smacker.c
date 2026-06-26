@@ -18,12 +18,23 @@
 #include "smk_bitstream.h"
 #include "smk_hufftree.h"
 
+#ifdef __DREAMCAST__
+/* Temporary diagnostic: SmackNextFrame's overall decode time has been
+   observed to climb steadily (a few ms up to 80+ms) over the course of a
+   single video on real Dreamcast hardware - see smk_render(s)'s
+   SMK_MODE_DISK branch below for where the timing is split out. */
+#include <arch/timer.h>
+#endif
+
 /* GLOBALS */
 /* tree processing order */
 #define SMK_TREE_MMAP 0
 #define SMK_TREE_MCLR 1
 #define SMK_TREE_FULL 2
 #define SMK_TREE_TYPE 3
+
+/* Read-ahead window size for SMK_MODE_DISK - see win_buf comment above. */
+#define SMK_DISK_WINDOW_BYTES (1024 * 1024)
 
 /* SMACKER DATA STRUCTURES */
 struct smk_t {
@@ -52,6 +63,20 @@ struct smk_t {
             /* on-disk mode */
             FILE* fp;
             unsigned long* chunk_offset;
+
+            /* Read-ahead window: a single bounded buffer holding the next
+				several frames' chunks, refilled with one sequential read
+				whenever playback walks off the end of it. Plain disk mode
+				(fseek+fread exactly one frame's chunk per smk_render call)
+				keeps memory flat but turns every frame into its own seek+read
+				- fine on a regular disk, but on optical media (e.g. a
+				Dreamcast GD-ROM) the per-call latency dominates and stalls
+				playback. Batching reads amortizes that latency while still
+				bounding memory to win_buf_cap instead of the whole file. */
+            unsigned char* win_buf;
+            unsigned long win_buf_cap;
+            unsigned long win_start_frame;
+            unsigned long win_num_frames;
         } file;
 
         /* in-memory mode: unprocessed chunks */
@@ -361,6 +386,11 @@ static smk smk_open_generic(const unsigned char m, union smk_read_t fp, unsigned
                 goto error;
             }
         }
+
+        smk_malloc(s->source.file.win_buf, SMK_DISK_WINDOW_BYTES);
+        s->source.file.win_buf_cap = SMK_DISK_WINDOW_BYTES;
+        s->source.file.win_start_frame = 0;
+        s->source.file.win_num_frames = 0;
     }
 
     return s;
@@ -469,6 +499,7 @@ void smk_close(smk s) {
             fclose(s->source.file.fp);
         }
         smk_free(s->source.file.chunk_offset);
+        smk_free(s->source.file.win_buf);
     } else {
         /* mem-mode */
         if (s->source.chunk_data != NULL) {
@@ -1065,6 +1096,40 @@ error:
 static char smk_render(smk s) {
     unsigned long i, size;
     unsigned char *buffer = NULL, *p, track;
+#ifdef __DREAMCAST__
+    /* Temporary diagnostic: correlate this function's total time against
+       this frame's chunk size, to check whether climbing decode time is
+       just proportional to genuinely more on-screen motion/detail to decode
+       later in the video (expected, not a bug) versus growing independent
+       of chunk size (which would point to a real algorithmic issue). */
+    static uint64_t g_diag_max_render_ms = 0;
+    uint64_t _diag_render_t0 = timer_ms_gettime64();
+    /* Time spent in the one-time disk window refill (see below) gets
+       subtracted out of this call's total, so a single big refill on frame
+       0 doesn't set an artificially high baseline that hides whether the
+       *decode* portion alone is the part actually climbing later on. */
+    uint64_t _diag_refill_ms = 0;
+    unsigned long _diag_chunk_size;
+#define SMK_RENDER_DIAG_CHECK()                                                                          \
+    do {                                                                                                 \
+        uint64_t _diag_dt = (timer_ms_gettime64() - _diag_render_t0) - _diag_refill_ms;                  \
+        if (_diag_dt > g_diag_max_render_ms) {                                                           \
+            g_diag_max_render_ms = _diag_dt;                                                             \
+            fprintf(stderr, "[smk-render-diag] render new max %lums excl. refill (frame %lu, chunk_size=%lu)\n", \
+                (unsigned long)g_diag_max_render_ms, s->cur_frame, _diag_chunk_size);                     \
+        }                                                                                                \
+        /* Also sample periodically regardless of new-max, so we get this   \
+           frame's actual render time even when it doesn't beat frame 0's   \
+           keyframe-inflated baseline - lets this be compared directly      \
+           against the same frame numbers in [smk-diag]/[dc-audio]. */      \
+        if ((s->cur_frame % 30) == 0) {                                                                  \
+            fprintf(stderr, "[smk-render-diag] render sample %lums excl. refill (frame %lu, chunk_size=%lu)\n", \
+                (unsigned long)_diag_dt, s->cur_frame, _diag_chunk_size);                                 \
+        }                                                                                                \
+    } while (0)
+#else
+#define SMK_RENDER_DIAG_CHECK() ((void)0)
+#endif
 
     /* sanity check */
     smk_assert(s);
@@ -1074,22 +1139,94 @@ static char smk_render(smk s) {
         fprintf(stderr, "libsmacker::smk_render(s) - Warning: frame %lu: chunk_size is 0.\n", s->cur_frame);
         goto error;
     }
+#ifdef __DREAMCAST__
+    _diag_chunk_size = i;
+#endif
 
     if (s->mode == SMK_MODE_DISK) {
-        /* Skip to frame in file */
-        if (fseek(s->source.file.fp, s->source.file.chunk_offset[s->cur_frame], SEEK_SET)) {
-            fprintf(stderr, "libsmacker::smk_render(s) - ERROR: fseek to frame %lu (offset %lu) failed.\n", s->cur_frame, s->source.file.chunk_offset[s->cur_frame]);
-            perror("\tError reported was");
-            goto error;
+        unsigned long f = s->cur_frame;
+        unsigned long total_frames = s->f + s->ring_frame;
+
+        /* Refill the read-ahead window with one sequential read if playback
+			has walked off the end of what's currently buffered. */
+        if (s->source.file.win_num_frames == 0 ||
+            f < s->source.file.win_start_frame ||
+            f >= s->source.file.win_start_frame + s->source.file.win_num_frames) {
+            unsigned long used = 0;
+            unsigned long fcount = 0;
+#ifdef __DREAMCAST__
+            static uint64_t g_diag_max_refill_ms = 0;
+            uint64_t _diag_t0 = timer_ms_gettime64();
+#endif
+
+            if (fseek(s->source.file.fp, s->source.file.chunk_offset[f], SEEK_SET)) {
+                fprintf(stderr, "libsmacker::smk_render(s) - ERROR: fseek to frame %lu (offset %lu) failed.\n", f, s->source.file.chunk_offset[f]);
+                perror("\tError reported was");
+                goto error;
+            }
+
+            /* Greedily pack as many sequential frames as fit, always
+				including at least the current frame even if it alone
+				exceeds the window (rare oversized keyframe). */
+            do {
+                used += s->chunk_size[f + fcount];
+                fcount++;
+            } while ((f + fcount) < total_frames && used + s->chunk_size[f + fcount] <= s->source.file.win_buf_cap);
+
+            if (used > s->source.file.win_buf_cap) {
+                /* This single frame doesn't fit the window - grow it just
+					this once rather than overflow the buffer. */
+                unsigned char* grown;
+                smk_malloc(grown, used);
+                smk_free(s->source.file.win_buf);
+                s->source.file.win_buf = grown;
+                s->source.file.win_buf_cap = used;
+            }
+
+            if (smk_read_file(s->source.file.win_buf, used, s->source.file.fp) < 0) {
+                fprintf(stderr, "libsmacker::smk_render(s) - ERROR: frame %lu (offset %lu): smk_read had errors.\n", f, s->source.file.chunk_offset[f]);
+                goto error;
+            }
+            s->source.file.win_start_frame = f;
+            s->source.file.win_num_frames = fcount;
+
+#ifdef __DREAMCAST__
+            {
+                uint64_t _diag_dt = timer_ms_gettime64() - _diag_t0;
+                _diag_refill_ms = _diag_dt;
+                if (_diag_dt > g_diag_max_refill_ms) {
+                    g_diag_max_refill_ms = _diag_dt;
+                    fprintf(stderr, "[smk-disk-diag] window refill new max %lums (frame %lu, used=%lu bytes, fcount=%lu)\n",
+                        (unsigned long)g_diag_max_refill_ms, f, used, fcount);
+                }
+            }
+#endif
         }
 
-        /* In disk-streaming mode: make way for our incoming chunk buffer */
-        smk_malloc(buffer, i);
-
-        /* Read into buffer */
-        if (smk_read_file(buffer, s->chunk_size[s->cur_frame], s->source.file.fp) < 0) {
-            fprintf(stderr, "libsmacker::smk_render(s) - ERROR: frame %lu (offset %lu): smk_read had errors.\n", s->cur_frame, s->source.file.chunk_offset[s->cur_frame]);
-            goto error;
+        /* Copy this frame's chunk out of the window into its own buffer -
+			downstream code (and the error path below) always frees `buffer`
+			itself, so it can't just point into the window. */
+        {
+            unsigned long off = 0, k;
+#ifdef __DREAMCAST__
+            static uint64_t g_diag_max_offcopy_ms = 0;
+            uint64_t _diag_t0 = timer_ms_gettime64();
+#endif
+            for (k = s->source.file.win_start_frame; k < f; k++) {
+                off += s->chunk_size[k];
+            }
+            smk_malloc(buffer, i);
+            memcpy(buffer, s->source.file.win_buf + off, i);
+#ifdef __DREAMCAST__
+            {
+                uint64_t _diag_dt = timer_ms_gettime64() - _diag_t0;
+                if (_diag_dt > g_diag_max_offcopy_ms) {
+                    g_diag_max_offcopy_ms = _diag_dt;
+                    fprintf(stderr, "[smk-disk-diag] offcopy new max %lums (frame %lu, off=%lu, walk=%lu, size=%lu)\n",
+                        (unsigned long)g_diag_max_offcopy_ms, f, off, f - s->source.file.win_start_frame, i);
+                }
+            }
+#endif
         }
     } else {
         /* Just point buffer at the right place */
@@ -1156,6 +1293,7 @@ static char smk_render(smk s) {
         smk_free(buffer);
     }
 
+    SMK_RENDER_DIAG_CHECK();
     return 0;
 
 error:
@@ -1166,6 +1304,7 @@ error:
 
     return -1;
 }
+#undef SMK_RENDER_DIAG_CHECK
 
 /* rewind to first frame and unpack */
 char smk_first(smk s) {

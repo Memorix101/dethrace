@@ -2,8 +2,12 @@
 
 #include <assert.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef __DREAMCAST__
+#include <malloc.h>
+#endif
 
 #include "harness/hooks.h"
 #include "harness/os.h"
@@ -13,6 +17,13 @@
 #include "smacker.h"
 
 static unsigned int smack_last_frame_time = 0;
+
+#ifdef __DREAMCAST__
+// Defined in harness/audio/dc_smacker_stream.c. Not part of the
+// cross-platform harness/audio.h interface since it's specific to how the
+// Dreamcast backend needs servicing - see the comment on that function.
+extern void DCSmackerStream_Poll(void);
+#endif
 
 static void copy_palette(Smack* smack) {
     const unsigned char* pal = smk_get_palette(smack->smk_handle);
@@ -34,7 +45,15 @@ Smack* SmackOpen(const char* name, unsigned int flags, unsigned int extrabuf) {
     if (f == NULL) {
         return NULL;
     }
+    // SMK_MODE_MEMORY preloads every frame's compressed chunk data into RAM
+    // up front - for a full FMV that's several MB, which exhausts the DC's
+    // 16MB budget mid-playback (stutter, then a crash/restart). SMK_MODE_DISK
+    // streams each frame's chunk from disk on demand instead.
+#ifdef __DREAMCAST__
+    smk_handle = smk_open_filepointer(f, SMK_MODE_DISK);
+#else
     smk_handle = smk_open_filepointer(f, SMK_MODE_MEMORY);
+#endif
     if (smk_handle == NULL) {
         fclose(f);
         return NULL;
@@ -117,12 +136,62 @@ int SmackDoFrame(Smack* smack) {
 }
 
 void SmackNextFrame(Smack* smack) {
+    // Temporary diagnostic: measure actual decode time against the frame's
+    // real-time budget (MSPerFrame), to check whether decode is the
+    // bottleneck behind the cutscene audio backlog/crash investigation.
+    // Prints only on a new worst-case duration, so this stays quiet unless
+    // decode is genuinely struggling.
+    static unsigned int g_diag_max_decode_ms = 0;
+    static int g_diag_frame_count = 0;
+    unsigned int _diag_t0 = gHarness_platform.GetTicks();
+    g_diag_frame_count++;
+
     smk_next(smack->smk_handle);
     copy_palette(smack);
+
+    // (Tried adding an extra DCSmackerStream_Poll() call here, on the theory
+    // that smk_next()'s tens-of-ms decode time was an unserviced gap. Made
+    // underruns measurably worse instead: KallistiOS's snd_stream_poll(),
+    // once playback is in the normal "ahead" state, has no half-buffer gate
+    // at all and attempts a real fill - including a real silence
+    // memset+DMA on failure - on every single call, so an extra poll when
+    // the ring is thin just means extra wasted fill attempts, not extra
+    // chances to catch up. Reverted; SmackWait's existing per-spin polling
+    // is the only servicing point.)
+
+    {
+        unsigned int _diag_dt = gHarness_platform.GetTicks() - _diag_t0;
+        if (_diag_dt > g_diag_max_decode_ms) {
+            g_diag_max_decode_ms = _diag_dt;
+            printf("[smk-diag] decode new max %ums (budget %lums)\n", g_diag_max_decode_ms, smack->MSPerFrame);
+        }
+    }
+
+    // Decode time has been observed to climb steadily over a single video
+    // (a few ms up to 40-70ms) instead of staying flat, which shouldn't
+    // happen for decoding the same kind of frame repeatedly. Track heap
+    // health alongside it to see whether this is fragmentation/a leak
+    // (used space growing, free space shrinking or getting choppier) rather
+    // than something in the decode algorithm itself.
+#ifdef __DREAMCAST__
+    if ((g_diag_frame_count % 30) == 0) {
+        struct mallinfo mi = mallinfo();
+        printf("[heap-diag] frame=%d used=%d free=%d free_chunks=%d\n",
+            g_diag_frame_count, mi.uordblks, mi.fordblks, mi.ordblks);
+    }
+#endif
 }
 
 int SmackWait(Smack* smack) {
     unsigned int now = gHarness_platform.GetTicks();
+#ifdef __DREAMCAST__
+    // The AICA buffer needs refilling far more often than once per decoded
+    // video frame (see DCSmackerStream_Poll's comment) - service it on
+    // every spin of this wait loop too, not just when a new frame finishes
+    // decoding, matching how a different Dreamcast dethrace fork
+    // (GPF/dethrace) services its own audio backend from inside SmackWait.
+    DCSmackerStream_Poll();
+#endif
     if (now < smack_last_frame_time + smack->MSPerFrame) {
         gHarness_platform.Sleep(1);
         return 1;
@@ -130,6 +199,17 @@ int SmackWait(Smack* smack) {
     smack_last_frame_time = now;
     return 0;
 }
+
+#ifdef __DREAMCAST__
+// Used by cutscene.c's decode-ahead logic (see the comment there for why):
+// reports whether there's still time left in the current frame's display
+// slot, using the exact same deadline SmackWait() itself waits against, so
+// idle CPU time that would otherwise just be spent sleeping/polling can
+// instead be used to decode (and push audio for) further frames.
+int DCSmackHasIdleBudget(Smack* smack) {
+    return gHarness_platform.GetTicks() < smack_last_frame_time + smack->MSPerFrame;
+}
+#endif
 
 void SmackClose(Smack* smack) {
     if (smack->audio_stream != NULL) {
