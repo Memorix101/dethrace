@@ -195,13 +195,7 @@ br_matrix34 gIdentity34 = {
 };
 
 // GLOBAL: CARM95 0x00520228
-#ifdef __DREAMCAST__
-// Temporary: shadows off to test whether they're the source of persistent
-// flicker reports, independent of the depth-bias fixes already applied.
-tShadow_level gShadow_level = eShadow_none;
-#else
 tShadow_level gShadow_level = eShadow_us_only;
-#endif
 
 // GLOBAL: CARM95 0x0052022c
 br_scalar gShadow_hither_z_move;
