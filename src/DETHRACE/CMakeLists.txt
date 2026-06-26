@@ -63,6 +63,162 @@ if(MINGW)
     target_compile_options(dethrace_obj PRIVATE -Wno-error=incompatible-pointer-types)
 endif()
 
+if(__DREAMCAST__)
+
+set(COMMON_COMPILE_FLAGS
+    -O3
+
+    #-fno-math-errno
+        #-fno-signed-zeros
+    #-fno-trapping-math
+    #-fassociative-math
+    #-freciprocal-math
+        #-funsafe-math-optimizations
+        #-ffinite-math-only
+    #-fno-rounding-math
+    #-fcx-limited-range
+    #-fno-signaling-nans
+    #-fexcess-precision=fast
+
+    #-fno-lto 
+    -fbuiltin 
+    -flto=auto
+    -ffast-math 
+    #-mfsca 
+    #-mfsrra
+    -ffp-contract=fast
+)
+target_compile_options(dethrace_obj PRIVATE ${COMMON_COMPILE_FLAGS})
+
+set(OPTIMIZED_FILES 
+    common/car.c 
+    common/controls.c 
+    common/crush.c 
+    common/displays.c 
+    #common/netgame.c 
+    common/utility.c
+)
+
+set_source_files_properties(
+    ${OPTIMIZED_FILES}
+    PROPERTIES COMPILE_FLAGS "-fno-builtin -fno-lto -fno-fast-math"
+)
+
+target_sources(dethrace_obj PRIVATE
+   common/skidmark.c
+    common/opponent.c
+    common/oil.c
+    common/racesumm.c
+    common/replay.c
+    common/loading.c
+    common/piping.c
+    common/powerup.c
+    common/netgame.c
+    common/world.c
+    common/network.c
+
+    common/brucetrk.c
+    common/brucetrk.h
+    common/car.c
+    common/car.h
+    common/controls.c
+    common/controls.h
+    common/crush.c
+    common/crush.h
+    common/cutscene.c
+    common/cutscene.h
+    common/demo.c
+    common/demo.h
+    common/depth.c
+    common/depth.h
+    common/displays.c
+    common/displays.h
+    common/drfile.c
+    common/drfile.h
+    common/drmem.c
+    common/drmem.h
+    common/errors.c
+    common/errors.h
+    common/finteray.c
+    common/finteray.h
+    common/flicplay.c
+    common/flicplay.h
+    common/globvars.c
+    common/globvars.h
+    common/globvrbm.c
+    common/globvrbm.h
+    common/globvrkm.c
+    common/globvrkm.h
+    common/globvrme.c
+    common/globvrme.h
+    common/globvrpb.c
+    common/globvrpb.h
+    common/grafdata.c
+    common/grafdata.h
+    common/graphics.c
+    common/graphics.h
+    common/init.c
+    common/init.h
+    common/input.c
+    common/input.h
+    common/intrface.c
+    common/intrface.h
+    common/loadsave.c
+    common/loadsave.h
+    common/main.c
+    common/main.h
+    common/mainloop.c
+    common/mainloop.h
+    common/mainmenu.c
+    common/mainmenu.h
+
+    common/newgame.c
+    common/newgame.h
+    common/oppocar.c
+    common/oppocar.h
+    common/oppoproc.c
+    common/oppoproc.h
+    common/options.c
+    common/options.h
+    common/pedestrn.c
+    common/pedestrn.h
+    common/pratcam.c
+    common/pratcam.h
+    common/racestrt.c
+    common/racestrt.h
+    common/raycast.c
+    common/raycast.h
+
+    common/sound.c
+    common/sound.h
+    common/spark.c
+    common/spark.h
+    common/structur.c
+    common/structur.h
+    common/trig.c
+    common/trig.h
+    common/utility.c
+    common/utility.h
+
+    constants.h
+    dr_types.h
+    pd/net.h
+    pd/sys.h
+
+    pc-all/allsys.c
+
+    # original win95 sys and network
+    # pc-win95/win95sys.c
+    # pc-win95/ssdx.c
+    # pc-win95/ssdx.h
+
+    # original dos sys and network
+    # pc-dos/dosnet.c
+    # pc-dos/dossys.c
+)
+
+else()
+
 target_sources(dethrace_obj PRIVATE
     common/skidmark.c
     common/opponent.c
@@ -175,6 +331,8 @@ target_sources(dethrace_obj PRIVATE
     # pc-dos/dosnet.c
     # pc-dos/dossys.c
 )
+
+endif()
 
 if(MSVC_42_FOR_RECCMP)
     target_sources(dethrace_obj PRIVATE pc-win95/win95net.c)

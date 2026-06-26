@@ -12,3 +12,7 @@ tools/carmdemo/
 tools/carmdemox/
 
 flycast.log
+
+capture/
+
+tools/carmdemou/

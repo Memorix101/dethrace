@@ -195,7 +195,13 @@ br_matrix34 gIdentity34 = {
 };
 
 // GLOBAL: CARM95 0x00520228
+#ifdef __DREAMCAST__
+// Temporary: shadows off to test whether they're the source of persistent
+// flicker reports, independent of the depth-bias fixes already applied.
+tShadow_level gShadow_level = eShadow_none;
+#else
 tShadow_level gShadow_level = eShadow_us_only;
+#endif
 
 // GLOBAL: CARM95 0x0052022c
 br_scalar gShadow_hither_z_move;
@@ -1710,7 +1716,18 @@ void ProcessShadow(tCar_spec* pCar, br_actor* pWorld, tTrack_spec* pTrack_spec, 
             gShadow_model->nvertices = 3 * f_num;
             gShadow_actor->render_style = BR_RSTYLE_FACES;
             BrModelAdd(gShadow_model);
+#ifdef __DREAMCAST__
+            /* The Dreamcast leaf renderer (dc_triangle_fill in v1model.c) bridges
+             * triangles straight to the PowerVR and never consults the shifted
+             * gDepth_shade_table below, so this re-render pass needs to know to
+             * darken its own output instead - see g_dc_in_shadow_pass. */
+            extern int g_dc_in_shadow_pass;
+            g_dc_in_shadow_pass = 1;
+#endif
             BrZbSceneRenderAdd(gShadow_actor);
+#ifdef __DREAMCAST__
+            g_dc_in_shadow_pass = 0;
+#endif
             BrModelRemove(gShadow_model);
             if (pCar->shadow_intersection_flags) {
                 oily_count = GetOilSpillCount();
@@ -1719,7 +1736,21 @@ void ProcessShadow(tCar_spec* pCar, br_actor* pWorld, tTrack_spec* pTrack_spec, 
                         GetOilSpillDetails(i, &oily_actor, &oily_size);
                         if (oily_actor) {
                             MungeIndexedOilsHeightAboveGround(i);
+#ifdef __DREAMCAST__
+                            /* Oil spill stains sit coplanar on the ground exactly
+                             * like the car's shadow does, and pop in and out the
+                             * same way without a dedicated depth bias (see
+                             * g_dc_in_decal_pass in v1model.c) - unlike the
+                             * shadow, their own material colour is already
+                             * correct, so this only needs the bias, not the
+                             * darkening g_dc_in_shadow_pass also applies. */
+                            extern int g_dc_in_decal_pass;
+                            g_dc_in_decal_pass = 1;
+#endif
                             BrZbSceneRenderAdd(oily_actor);
+#ifdef __DREAMCAST__
+                            g_dc_in_decal_pass = 0;
+#endif
                         }
                     }
                 }

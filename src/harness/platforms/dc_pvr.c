@@ -28,6 +28,20 @@
 
 #define DC_AXIS_DEADZONE 16000
 
+// Feature isolation switches for the persistent level-geometry flicker. Every
+// system that touches per-triangle depth/texture state is suspect and every
+// individual test so far (z-bias magnitude and sign, mipmapping, eviction
+// timing, fog) changed nothing, so instead of guessing one at a time: all off
+// here as a baseline, then flip one at a time in later builds until either the
+// flicker reappears (pins the cause) or everything is back on with no
+// flicker returning (means it was never in this set).
+#define DC_FEAT_MIPMAP 0
+#define DC_FEAT_ZBIAS 0
+#define DC_FEAT_FOG 0
+#define DC_FEAT_EVICT 0
+#define DC_FEAT_BILINEAR 0
+#define DC_FEAT_STALECHECK 0
+
 extern void QuitGame(void);
 extern br_pixelmap* gBack_screen;
 // The 3D render viewport. It is a sub-rectangle of gBack_screen (the game frames
@@ -95,6 +109,27 @@ extern int g3d_diag_nullps;
 extern int g3d_diag_nullbuf;
 extern int g3d_diag_wrongtype;
 extern int g3d_diag_lasttype;
+// diagnostic: triangles dropped whole by dc_triangle_fill's near-zero-W guard
+// (no fallback draw - a dropped triangle exposes the black PVR background)
+int g3d_diag_degenw;
+// diagnostic: smallest surviving (non-dropped) vertex W seen since the last
+// report, to check whether BRender's clipper is letting through W values
+// small enough to blow up 1/w precision without tripping the degenerate guard.
+float g3d_diag_minw = 1.0e30f;
+// diagnostic: range of comp_f[C_I] actually reaching dc_face_colour for
+// TEXTURED triangles, to check whether it's really a clean 0..1 brightness
+// (as dc_face_colour assumes) for every material/lighting mode in the game, or
+// whether some materials drive it through a different numeric convention that
+// the *255 clamp-to-0..255 formula mishandles (silently going pure black or
+// pure white instead of the intended shade).
+float g3d_diag_minI = 1.0e30f;
+float g3d_diag_maxI = -1.0e30f;
+// diagnostic: does comp_scales/offsets[C_I] vary per material (consistent with
+// material->index_base/index_range) or stay constant across the whole frame?
+float g3d_diag_iscale_min = 1.0e30f;
+float g3d_diag_iscale_max = -1.0e30f;
+float g3d_diag_ioffset_min = 1.0e30f;
+float g3d_diag_ioffset_max = -1.0e30f;
 // diagnostic: how often DepthEffectSky actually calls DoHorizon (vs skips it)
 int g3d_diag_dohorizon_run;
 int g3d_diag_dohorizon_skip;
@@ -109,7 +144,29 @@ typedef struct {
     float us, vs;  // UV scale = real_size / pow2_size
     int mipmapped; // 1 = square twiddled mipmap chain, 0 = plain non-twiddled
     int last_used; // g3d_frame_num this slot was last hit or (re)registered
+    int srcw, srch;   // source width/height at registration, to catch reuse
+    uint32_t checksum; // sparse hash of source pixels, to catch reuse
 } tDC3D_texture;
+
+// diagnostic/correctness: cache hits where the source pointer matches but the
+// image doesn't (BRender freed and reused this address for different texture
+// data - track art streams in/out per section, so this happens far more for
+// level textures than for the one car texture set that lives the whole race).
+// A stale hit would silently serve the wrong PVR texture for that surface.
+int g3d_diag_stale_tex;
+
+// Cheap sparse hash of 8bpp source pixels: enough samples to almost certainly
+// catch a genuinely different image, without the cost of hashing the whole
+// buffer on every cache lookup.
+static uint32_t dc3d_tex_checksum(const uint8_t* pixels, int w, int h, int stride) {
+    uint32_t hv = 2166136261u;
+    for (int s = 0; s < 32; s++) {
+        int x = (s * 37) % w;
+        int y = (s * 23) % h;
+        hv = (hv ^ pixels[y * stride + x]) * 16777619u;
+    }
+    return hv;
+}
 
 #define DC3D_MAX_TEX 192
 static tDC3D_texture g3d_tex[DC3D_MAX_TEX];
@@ -117,15 +174,24 @@ static int g3d_tex_count;
 // Incremented once per frame in DCPVR_Swap. Drives LRU eviction below.
 static int g3d_frame_num;
 
-// Free the least-recently-used texture that was NOT touched this frame (evicting
-// one still referenced by this frame's already-queued triangles would make them
-// point at whatever gets registered into the reused slot) and isn't already free.
+// diagnostic: how many textures dc3d_evict_lru has actually freed, ever.
+int g3d_diag_evictions;
+
+// Free the least-recently-used texture that wasn't touched this frame OR the
+// previous one, and isn't already free. The 1-frame margin (not just "this
+// frame") matters because eviction runs during the CPU-side BRender walk for
+// frame N, while frame N-1's submission is still rendering asynchronously on
+// the PVR (DCPVR_Swap's pvr_wait_ready for frame N hasn't even been reached
+// yet at this point) - evicting a texture frame N-1 is still using would
+// overwrite VRAM out from under that in-flight render, corrupting whatever is
+// on screen for one frame. Skipping anything used in the last 2 frames keeps
+// eviction at least a full frame behind the hardware.
 // Returns its slot index ready for reuse, or -1 if nothing is evictable.
 static int dc3d_evict_lru(void) {
     int victim = -1;
     int oldest = 0;
     for (int i = 0; i < g3d_tex_count; i++) {
-        if (g3d_tex[i].key == NULL || g3d_tex[i].last_used >= g3d_frame_num) {
+        if (g3d_tex[i].key == NULL || g3d_tex[i].last_used >= g3d_frame_num - 1) {
             continue;
         }
         if (victim < 0 || g3d_tex[i].last_used < oldest) {
@@ -139,6 +205,7 @@ static int dc3d_evict_lru(void) {
     pvr_mem_free(g3d_tex[victim].tex);
     g3d_tex[victim].key = NULL;
     g3d_tex[victim].tex = NULL;
+    g3d_diag_evictions++;
     return victim;
 }
 
@@ -147,6 +214,9 @@ static int dc3d_evict_lru(void) {
 // instead of leaving newly-needed ones permanently unregistered.
 static pvr_ptr_t dc3d_alloc_evicting(uint32_t bytes) {
     pvr_ptr_t p = pvr_mem_malloc(bytes);
+    if (!DC_FEAT_EVICT) {
+        return p;
+    }
     int guard = DC3D_MAX_TEX;
     while (p == NULL && guard-- > 0) {
         if (dc3d_evict_lru() < 0) {
@@ -214,16 +284,32 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
     if (pixels == NULL || w <= 0 || h <= 0) {
         return -1;
     }
+    uint32_t csum = DC_FEAT_STALECHECK ? dc3d_tex_checksum((const uint8_t*)pixels, w, h, stride) : 0;
+    int stale_slot = -1;
     for (int i = 0; i < g3d_tex_count; i++) {
         if (g3d_tex[i].key == pixels) {
-            g3d_tex[i].last_used = g3d_frame_num;
-            return i;
+            if (!DC_FEAT_STALECHECK || (g3d_tex[i].srcw == w && g3d_tex[i].srch == h && g3d_tex[i].checksum == csum)) {
+                g3d_tex[i].last_used = g3d_frame_num;
+                return i;
+            }
+            // Same pointer, different image: re-register into this same slot
+            // rather than treating it as a fresh texture, so it isn't also
+            // mistaken for a duplicate of whatever else now holds this pointer.
+            g3d_diag_stale_tex++;
+            if (g3d_tex[i].tex != NULL) {
+                pvr_mem_free(g3d_tex[i].tex);
+            }
+            g3d_tex[i].key = NULL;
+            g3d_tex[i].tex = NULL;
+            stale_slot = i;
+            break;
         }
     }
-    // Prefer an already-freed slot (from a past eviction) over growing the
-    // array; only evict when the array is full and has no free slot either.
-    int slot = -1;
-    for (int i = 0; i < g3d_tex_count; i++) {
+    // Prefer an already-freed slot (from a past eviction, or just invalidated
+    // above) over growing the array; only evict when the array is full and has
+    // no free slot either.
+    int slot = stale_slot;
+    for (int i = 0; slot < 0 && i < g3d_tex_count; i++) {
         if (g3d_tex[i].key == NULL) {
             slot = i;
             break;
@@ -233,7 +319,7 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
         if (g3d_tex_count < DC3D_MAX_TEX) {
             slot = g3d_tex_count++;
         } else {
-            slot = dc3d_evict_lru();
+            slot = DC_FEAT_EVICT ? dc3d_evict_lru() : -1;
             if (slot < 0) {
                 return -1;
             }
@@ -248,7 +334,7 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
     // is the clamped source in a pw x pw square; UV scale keeps the real w x h in
     // the top-left. Non-square (or oversized) textures keep the plain
     // non-twiddled path below.
-    if (pw == ph && pw <= DC3D_MIP_MAX) {
+    if (DC_FEAT_MIPMAP && pw == ph && pw <= DC3D_MIP_MAX) {
         int s = pw;
         pvr_ptr_t tex = dc3d_alloc_evicting((uint32_t)(s * s * 2) + dc_mip_offset(s));
         if (tex != NULL) {
@@ -280,6 +366,9 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
             g3d_tex[slot].vs = (float)h / s;
             g3d_tex[slot].mipmapped = 1;
             g3d_tex[slot].last_used = g3d_frame_num;
+            g3d_tex[slot].srcw = w;
+            g3d_tex[slot].srch = h;
+            g3d_tex[slot].checksum = csum;
             return slot;
         }
         // fall through to the plain path if the mipmap allocation failed
@@ -309,6 +398,9 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
     g3d_tex[slot].vs = (float)h / ph;
     g3d_tex[slot].mipmapped = 0;
     g3d_tex[slot].last_used = g3d_frame_num;
+    g3d_tex[slot].srcw = w;
+    g3d_tex[slot].srch = h;
+    g3d_tex[slot].checksum = csum;
     return slot;
 }
 
@@ -369,21 +461,34 @@ static float g3d_sx, g3d_sy, g3d_ox, g3d_oy;
 // per pixel by 1/w; coplanar surfaces (a shadow/skidmark/marking on the road)
 // share the same 1/w, so during motion their order flips and they flicker. We
 // nudge each triangle's depth nearer in proportion to its submission order, so a
-// decal drawn after the road it sits on stays consistently in front. The bias is
-// relative (multiplies z), and `i` is the global submission index across the
-// whole frame (up to ~1800), so for very close geometry (large 1/w, e.g. the
-// player's own car) the old 1e-6 factor could grow bigger than the real depth
-// gap between two unrelated, merely-close-together triangles and flip their
-// order - showing up as jagged black spikes right around the car. Kept 100x
-// smaller so it stays well below genuine depth differences.
-#define DC3D_ZBIAS_PER_TRI 1.0e-8f
+// decal drawn after the road it sits on stays consistently in front. `i` is the
+// global submission index across the whole frame (up to ~1800). This was
+// previously dropped to 1e-8 on suspicion it was amplifying too much on close
+// geometry and causing jagged black spikes near the car - that turned out to be
+// an unrelated bug (the car's drop shadow, fixed separately in
+// dc_triangle_fill/v1model.c).
+//
+// Neither 1e-6 nor 1e-8 nor a multiplicative 1e-4 stopped level-only flicker
+// (cars never show it). PowerVR depth is 1/w, which loses absolute precision at
+// distance - the same real-world gap between two surfaces shrinks roughly with
+// distance^2 once converted to 1/w, so two architectural pieces authored flush
+// against each other (an archway frame against its tunnel wall, trim against a
+// pillar) can be numerically tied at typical level-geometry range, flipping
+// order as the camera rotates and recomputes 1/w. The car never shows this
+// because it's always close, where 1/w still has ample precision. A
+// *multiplicative* bias (the old `z * (1 + i*eps)`) scales down exactly where
+// this hurts most - tiny depth values get a tinier absolute nudge - so it can
+// never reliably beat the precision loss at range. Made it additive instead: a
+// fixed absolute amount per submission-order step, independent of how small the
+// depth value already is.
+#define DC3D_ZBIAS_PER_TRI 1.0e-5f
 
-static void dc3d_emit_vertex(const tDC3D_vertex* t, float us, float vs, float zmul, int eol) {
+static void dc3d_emit_vertex(const tDC3D_vertex* t, float us, float vs, float zadd, int eol) {
     pvr_vertex_t v;
     v.flags = eol ? PVR_CMD_VERTEX_EOL : PVR_CMD_VERTEX;
     v.x = (t->x + g3d_ox) * g3d_sx;
     v.y = (t->y + g3d_oy) * g3d_sy;
-    v.z = t->z * zmul;
+    v.z = t->z + zadd;
     v.u = t->u * us;
     v.v = t->v * vs;
     v.argb = t->argb;
@@ -437,25 +542,27 @@ static void dc3d_submit_list(int list, int want_cat) {
             } else if (g3d_tex[tex].mipmapped) {
                 // Twiddled square texture with a mipmap chain: bilinear mipmapping.
                 pvr_poly_cxt_txr(&cxt, list, PVR_TXRFMT_ARGB1555,
-                    g3d_tex[tex].pw, g3d_tex[tex].ph, g3d_tex[tex].tex, PVR_FILTER_BILINEAR);
+                    g3d_tex[tex].pw, g3d_tex[tex].ph, g3d_tex[tex].tex,
+                    DC_FEAT_BILINEAR ? PVR_FILTER_BILINEAR : PVR_FILTER_NONE);
                 cxt.txr.mipmap = PVR_MIPMAP_ENABLE;
             } else {
                 pvr_poly_cxt_txr(&cxt, list,
                     PVR_TXRFMT_ARGB1555 | PVR_TXRFMT_NONTWIDDLED,
-                    g3d_tex[tex].pw, g3d_tex[tex].ph, g3d_tex[tex].tex, PVR_FILTER_BILINEAR);
+                    g3d_tex[tex].pw, g3d_tex[tex].ph, g3d_tex[tex].tex,
+                    DC_FEAT_BILINEAR ? PVR_FILTER_BILINEAR : PVR_FILTER_NONE);
             }
             cxt.gen.culling = PVR_CULLING_NONE;
-            cxt.gen.fog_type = gDC_fog_enabled ? PVR_FOG_TABLE : PVR_FOG_DISABLE;
+            cxt.gen.fog_type = (DC_FEAT_FOG && gDC_fog_enabled) ? PVR_FOG_TABLE : PVR_FOG_DISABLE;
             pvr_poly_compile(&hdr, &cxt);
             pvr_prim(&hdr, sizeof(hdr));
         }
         float us = (tex < 0) ? 1.f : g3d_tex[tex].us;
         float vs = (tex < 0) ? 1.f : g3d_tex[tex].vs;
-        float zmul = 1.0f + (float)i * DC3D_ZBIAS_PER_TRI;
+        float zadd = DC_FEAT_ZBIAS ? (float)i * DC3D_ZBIAS_PER_TRI : 0.0f;
         const tDC3D_vertex* t = &g3d_verts[i * 3];
-        dc3d_emit_vertex(&t[0], us, vs, zmul, 0);
-        dc3d_emit_vertex(&t[1], us, vs, zmul, 0);
-        dc3d_emit_vertex(&t[2], us, vs, zmul, 1);
+        dc3d_emit_vertex(&t[0], us, vs, zadd, 0);
+        dc3d_emit_vertex(&t[1], us, vs, zadd, 0);
+        dc3d_emit_vertex(&t[2], us, vs, zadd, 1);
     }
 }
 
@@ -820,10 +927,14 @@ static void DCPVR_Swap(br_pixelmap* back_buffer) {
                 (gRender_screen != NULL) ? gRender_screen->base_y : -1,
                 (gRender_screen != NULL) ? gRender_screen->width : -1,
                 (gRender_screen != NULL) ? gRender_screen->height : -1);*/
-            printf("[dcpvr] fps=%d tris=%d tex=%d notex=%d texfail=%d nullps=%d nullbuf=%d wrongtype=%d lasttype=%d horizon_run=%d horizon_skip=%d\n",
+            printf("[dcpvr] fps=%d tris=%d tex=%d notex=%d texfail=%d nullps=%d nullbuf=%d wrongtype=%d lasttype=%d horizon_run=%d horizon_skip=%d sky_index=%d sky_argb=%08x degenw=%d evict=%d minw=%g stale=%d minI=%g maxI=%g iscale=[%g,%g] ioffset=[%g,%g]\n",
                 fps, g3d_last_submitted, g3d_tex_count, g3d_diag_notex, g3d_diag_texfail,
                 g3d_diag_nullps, g3d_diag_nullbuf, g3d_diag_wrongtype, g3d_diag_lasttype,
-                g3d_diag_dohorizon_run, g3d_diag_dohorizon_skip);
+                g3d_diag_dohorizon_run, g3d_diag_dohorizon_skip, gDC_sky_index,
+                (unsigned int)DCPVR3D_PaletteColor(gDC_sky_index), g3d_diag_degenw, g3d_diag_evictions,
+                (double)g3d_diag_minw, g3d_diag_stale_tex, (double)g3d_diag_minI, (double)g3d_diag_maxI,
+                (double)g3d_diag_iscale_min, (double)g3d_diag_iscale_max,
+                (double)g3d_diag_ioffset_min, (double)g3d_diag_ioffset_max);
             g3d_diag_notex = 0;
             g3d_diag_texfail = 0;
             g3d_diag_nullps = 0;
@@ -831,6 +942,14 @@ static void DCPVR_Swap(br_pixelmap* back_buffer) {
             g3d_diag_wrongtype = 0;
             g3d_diag_dohorizon_run = 0;
             g3d_diag_dohorizon_skip = 0;
+            g3d_diag_degenw = 0;
+            g3d_diag_minw = 1.0e30f;
+            g3d_diag_minI = 1.0e30f;
+            g3d_diag_maxI = -1.0e30f;
+            g3d_diag_iscale_min = 1.0e30f;
+            g3d_diag_iscale_max = -1.0e30f;
+            g3d_diag_ioffset_min = 1.0e30f;
+            g3d_diag_ioffset_max = -1.0e30f;
             if (gVmu != NULL) {
                 char buf[16];
                 snprintf(buf, sizeof(buf), "FPS\n%d", fps);
