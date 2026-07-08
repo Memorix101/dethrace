@@ -66,6 +66,16 @@ static uint16_t converted_palette[256];
 // sky colour) is transparent, every other index opaque, so the overlay can be
 // composited in front of the hardware 3D with the 3D showing through index 0.
 static uint16_t converted_palette_argb1555[256];
+
+// When non-NULL, DCPVR3D_RegisterTexture bakes source texels through this
+// 256-entry ARGB1555 lookup instead of the raw palette. Used for blended effect
+// sprites (smoke/dust): their texels are source indices into the game's
+// blend/shade table (out = blend[dest*256 + src]), NOT displayable colours, so
+// the raw index renders the wrong hue (a smoke texel 0xf1 is dark blue in the
+// palette). dc_triangle_fill fills this with palette[blend[D*256 + src]] against
+// a representative background D so the baked texture shows the tinted colour.
+// Set only around the register call for such a sprite, then cleared.
+const uint16_t* g_dc_blend_lut;
 static br_pixelmap* last_screen_src;
 static int render_width, render_height;
 
@@ -91,7 +101,12 @@ typedef struct {
     uint32_t argb;
 } tDC3D_vertex;
 
-#define DC3D_MAX_TRIS 24000
+// Peak observed per frame is ~1825 triangles; 24000 was ~13x overkill and its
+// static buffers (g3d_verts alone is DC3D_MAX_TRIS*3*24 bytes) ate ~1.85 MB of
+// the Dreamcast's 16 MB, which was pushing level loads into out-of-memory
+// aborts. 8192 keeps a ~4.5x margin (and overflow just drops the excess
+// triangles for one frame, never crashes) while giving back ~1.2 MB of RAM.
+#define DC3D_MAX_TRIS 8192
 static tDC3D_vertex g3d_verts[DC3D_MAX_TRIS * 3];
 static int16_t g3d_tritex[DC3D_MAX_TRIS]; // texture cache index per triangle, -1 = untextured
 static uint8_t g3d_tricat[DC3D_MAX_TRIS];  // 0 = opaque (OP), 1 = punch-through (PT), 2 = blended (TR)
@@ -168,7 +183,16 @@ static uint32_t dc3d_tex_checksum(const uint8_t* pixels, int w, int h, int strid
     return hv;
 }
 
-#define DC3D_MAX_TEX 192
+// Raised from 192: the cache was pinned at 192/192 with evictions climbing
+// steadily during play (repeated texture re-conversion + re-upload) while VRAM
+// still had room. More slots let the working set stay resident (observed peak
+// ~197). Kept at 256 rather than higher because each slot also costs main RAM
+// (this struct array + the sort key array), and the game runs right at the edge
+// of the Dreamcast's 16 MB in low-memory mode - 320 tipped model prep into an
+// out-of-memory abort at level load. 256 clears the working set with margin
+// while staying within budget. VRAM-full is still handled (dc3d_alloc_evicting
+// evicts on pvr_mem_malloc failure).
+#define DC3D_MAX_TEX 256
 static tDC3D_texture g3d_tex[DC3D_MAX_TEX];
 static int g3d_tex_count;
 // Incremented once per frame in DCPVR_Swap. Drives LRU eviction below.
@@ -284,12 +308,28 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
     if (pixels == NULL || w <= 0 || h <= 0) {
         return -1;
     }
+    // Fast path: a material's triangles are submitted back to back, so the vast
+    // majority of calls ask for the exact same texture as the previous call.
+    // Remember the last hit and check it first, skipping the linear scan over
+    // up to 192 cache slots that would otherwise run for every textured
+    // triangle. Re-validated against the slot's current key so an eviction that
+    // reused the slot can't return a stale index.
+    static void* s_last_key = NULL;
+    static int s_last_slot = -1;
+    if (pixels == s_last_key && s_last_slot >= 0 &&
+        s_last_slot < g3d_tex_count && g3d_tex[s_last_slot].key == pixels &&
+        (!DC_FEAT_STALECHECK || (g3d_tex[s_last_slot].srcw == w && g3d_tex[s_last_slot].srch == h))) {
+        g3d_tex[s_last_slot].last_used = g3d_frame_num;
+        return s_last_slot;
+    }
     uint32_t csum = DC_FEAT_STALECHECK ? dc3d_tex_checksum((const uint8_t*)pixels, w, h, stride) : 0;
     int stale_slot = -1;
     for (int i = 0; i < g3d_tex_count; i++) {
         if (g3d_tex[i].key == pixels) {
             if (!DC_FEAT_STALECHECK || (g3d_tex[i].srcw == w && g3d_tex[i].srch == h && g3d_tex[i].checksum == csum)) {
                 g3d_tex[i].last_used = g3d_frame_num;
+                s_last_key = pixels;
+                s_last_slot = i;
                 return i;
             }
             // Same pointer, different image: re-register into this same slot
@@ -328,6 +368,9 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
     int pw = dc_pow2_ceil(w);
     int ph = dc_pow2_ceil(h);
     const uint8_t* src = (const uint8_t*)pixels;
+    // Blended effect sprites bake through the blend LUT (see g_dc_blend_lut);
+    // everything else uses the raw palette.
+    const uint16_t* bake = g_dc_blend_lut ? g_dc_blend_lut : converted_palette_argb1555;
 
     // Square textures up to DC3D_MIP_MAX get a twiddled mipmap chain (bilinear
     // mipmapping removes the texture shimmer/crawl while moving). The base level
@@ -343,7 +386,7 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
                 const uint8_t* srow = src + (y < h ? y : h - 1) * stride;
                 uint16_t* drow = g3d_mip_a + y * s;
                 for (int x = 0; x < s; x++) {
-                    drow[x] = converted_palette_argb1555[srow[x < w ? x : w - 1]];
+                    drow[x] = bake[srow[x < w ? x : w - 1]];
                 }
             }
             // Twiddle-load each level (largest first), downsampling as we go.
@@ -369,6 +412,8 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
             g3d_tex[slot].srcw = w;
             g3d_tex[slot].srch = h;
             g3d_tex[slot].checksum = csum;
+            s_last_key = pixels;
+            s_last_slot = slot;
             return slot;
         }
         // fall through to the plain path if the mipmap allocation failed
@@ -387,7 +432,7 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
         const uint8_t* srow = src + (y < h ? y : h - 1) * stride;
         uint16_t* drow = dst + y * pw;
         for (int x = 0; x < pw; x++) {
-            drow[x] = converted_palette_argb1555[srow[x < w ? x : w - 1]];
+            drow[x] = bake[srow[x < w ? x : w - 1]];
         }
     }
     g3d_tex[slot].key = pixels;
@@ -401,7 +446,40 @@ int DCPVR3D_RegisterTexture(void* pixels, int w, int h, int stride) {
     g3d_tex[slot].srcw = w;
     g3d_tex[slot].srch = h;
     g3d_tex[slot].checksum = csum;
+    s_last_key = pixels;
+    s_last_slot = slot;
     return slot;
+}
+
+static uint16_t g_blend_lut_buf[256];
+static const void* g_blend_lut_table; // cache key so the LUT rebuilds only when the (table,row) changes
+static int g_blend_lut_row = -1;
+
+// Arm g_dc_blend_lut for the next DCPVR3D_RegisterTexture call so an effect
+// sprite's texels bake through one row of a 256-wide game table
+// (out = table[row*stride + src]) - turning the source indices into the colours
+// the software renderer would produce, instead of showing the raw (wrong-hue)
+// index. Used for the flames: softrend maps a textured sprite's texel through
+// index_shade at the vertex-intensity row (shade[intensity*256 + texel], see
+// fti8pizp.c), which DC otherwise skips. Cached by (table pointer, row).
+void DCPVR3D_ArmRemapLut(const void* table, int stride, int row) {
+    if (table == NULL) {
+        g_dc_blend_lut = NULL;
+        return;
+    }
+    if (g_blend_lut_table != table || g_blend_lut_row != row) {
+        const uint8_t* base = (const uint8_t*)table + (size_t)row * stride;
+        for (int s = 0; s < 256; s++) {
+            g_blend_lut_buf[s] = (s == 0) ? (uint16_t)0 : converted_palette_argb1555[base[s]];
+        }
+        g_blend_lut_table = table;
+        g_blend_lut_row = row;
+    }
+    g_dc_blend_lut = g_blend_lut_buf;
+}
+
+void DCPVR3D_DisarmBlendLut(void) {
+    g_dc_blend_lut = NULL;
 }
 
 void DCPVR3D_AddTriTex(
@@ -918,18 +996,14 @@ static void DCPVR_Swap(br_pixelmap* back_buffer) {
         Uint32 elapsed = now - gFps_last_time;
         if (elapsed >= 500) {
             int fps = (int)((gFrame_count * 1000 + elapsed / 2) / elapsed);
-            // Diagnostic: report fps and how many 3D triangles reached the PVR.
-            /*printf("[dcpvr] fps=%d tris=%d tex=%d back=%dx%d vp=%d,%d+%dx%d\n",
-                fps, g3d_last_submitted, g3d_tex_count,
-                (last_screen_src != NULL) ? last_screen_src->width : -1,
-                (last_screen_src != NULL) ? last_screen_src->height : -1,
-                (gRender_screen != NULL) ? gRender_screen->base_x : -1,
-                (gRender_screen != NULL) ? gRender_screen->base_y : -1,
-                (gRender_screen != NULL) ? gRender_screen->width : -1,
-                (gRender_screen != NULL) ? gRender_screen->height : -1);*/
-            /*printf("[dcpvr] fps=%d tris=%d tex=%d/%d notex=%d texfail=%d evict=%d stale=%d\n",
-                fps, g3d_last_submitted, g3d_tex_count, DC3D_MAX_TEX, g3d_diag_notex, g3d_diag_texfail,
-                g3d_diag_evictions, g3d_diag_stale_tex);*/
+            // Perf diagnostic: fps + how many 3D triangles reached the PVR + how
+            // full the texture cache is. Re-enabled while optimising the path.
+            // xf_fast/xf_scalar: per-vertex transforms through the sh4zam (FTRV)
+            // path vs the remaining scalar paths, summed over this interval -
+            // shows whether extending sh4zam to the scalar functions is worth
+            // it. Divide by frame count for per-frame vertex volume.
+            printf("[dcpvr] fps=%d tris=%d tex=%d/%d evict=%d\n",
+                fps, g3d_last_submitted, g3d_tex_count, DC3D_MAX_TEX, g3d_diag_evictions);
             g3d_diag_notex = 0;
             g3d_diag_texfail = 0;
             g3d_diag_nullps = 0;
@@ -998,6 +1072,10 @@ static void DCPVR_PaletteChanged(br_colour entries[256]) {
     if (big_change > 96) {
         dc3d_clear_texture_cache();
     }
+    // The sprite bake LUT is built from converted_palette_argb1555, so force it
+    // to rebuild after any palette change.
+    g_blend_lut_table = NULL;
+    g_blend_lut_row = -1;
     if (last_screen_src != NULL) {
         DCPVR_Swap(last_screen_src);
     }

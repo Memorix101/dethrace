@@ -20,6 +20,7 @@ extern int gSound_override;
 extern int gSausage_override;
 extern int gGraf_spec_index;
 extern int gAustere_override;
+extern int gCut_scene_override;
 
 extern void Harness_Platform_Init(tHarness_platform* platform);
 
@@ -529,6 +530,14 @@ static int Harness_Ini_Callback(void* user, const char* section, const char* nam
         // Force low memory ("austere") mode, equivalent to the -lomem flag.
         // Required on memory constrained targets such as the Dreamcast.
         gAustere_override = (value[0] == '1');
+    } else if (MATCH("General", "Cutscenes")) {
+        // Skip the Smacker FMV cutscenes, equivalent to the -nocutscenes flag.
+        // The shipped Dreamcast ini has always set Cutscenes = 0 but nothing
+        // consumed it, so the intro FMV played anyway - and on the 16 MB
+        // Dreamcast its decode buffers (a 1 MB read-ahead window plus the audio
+        // ring) could tip an already tight heap into an out-of-memory abort
+        // before the race even loaded. gCut_scene_override = 1 disables them.
+        gCut_scene_override = (value[0] == '0');
     } else if (MATCH("General", "PhysicsPerFrame")) {
         harness_game_config.physics_per_frame = (value[0] == '1');
     }
