@@ -1,5 +1,29 @@
 #include "graphics.h"
 
+#ifdef __DREAMCAST__
+// Temporary walk-attribution profiling: RenderAFrame's scene block and its
+// software-effects span are timed into these (defined in dc_pvr.c, printed
+// once per second from the fps line) to split the per-frame CPU time into
+// BRender scene vs software fx vs game logic before deciding where the next
+// optimisation effort goes.
+#include <arch/timer.h>
+extern unsigned long long g_dc_t_scene, g_dc_t_fx, g_dc_t_fx2;
+extern unsigned long long g_dc_t_shad, g_dc_t_ntrack, g_dc_t_track;
+// Temporary: how many actors the non-track scene walk visits per frame. The
+// LOD ceiling test proved the 12-17ms ProcessNonTrackActors cost is NOT car
+// model faces; the suspicion is sheer actor count (every ped/wheel/pickup is
+// an actor paying matrix-concat + on-screen-check overhead).
+extern int g_dc_actor_count;
+static int dc_count_actors(br_actor* a) {
+    int n = 1;
+    br_actor* c;
+    for (c = a->children; c != NULL; c = c->next) {
+        n += dc_count_actors(c);
+    }
+    return n;
+}
+#endif
+
 #include "brender.h"
 #include "car.h"
 #include "constants.h"
@@ -2098,6 +2122,10 @@ void RenderAFrame(int pDepth_mask_on) {
     PDUnlockRealBackScreen(1);
 #endif
 
+#ifdef __DREAMCAST__
+    uint64_t _dc_scene_t0 = timer_us_gettime64();
+    g_dc_actor_count = dc_count_actors(gNon_track_actor);
+#endif
 #if !defined(DETHRACE_FIX_BUGS)
     // in map mode, the scene is rendered 3 times. We have no idea why.
     for (i = 0; i < (gMap_mode ? 3 : 1); i++)
@@ -2105,23 +2133,50 @@ void RenderAFrame(int pDepth_mask_on) {
     for (i = 0; i < (gMap_mode && !gSmall_frames_are_slow ? 3 : 1); i++)
 #endif
     {
+#ifdef __DREAMCAST__
+        uint64_t _dc_sub_t = timer_us_gettime64();
+#define DC_SUB_LAP(acc) do { uint64_t _n = timer_us_gettime64(); (acc) += _n - _dc_sub_t; _dc_sub_t = _n; } while (0)
+#else
+#define DC_SUB_LAP(acc)
+#endif
         RenderShadows(gUniverse_actor, &gProgram_state.track_spec, gCamera, &gCamera_to_world);
+        DC_SUB_LAP(g_dc_t_shad);
         BrZbSceneRenderBegin(gUniverse_actor, gCamera, gRender_screen, gDepth_buffer);
         ProcessNonTrackActors(gRender_screen, gDepth_buffer, gCamera, &gCamera_to_world, &old_camera_matrix);
+        DC_SUB_LAP(g_dc_t_ntrack);
         ProcessTrack(gUniverse_actor, &gProgram_state.track_spec, gCamera, &gCamera_to_world, 0);
+        DC_SUB_LAP(g_dc_t_track);
         RenderLollipops();
 
+#ifdef __DREAMCAST__
+        uint64_t _dc_fx_t0 = timer_us_gettime64();
+#endif
         DepthEffectSky(gRender_screen, gDepth_buffer, gCamera, &gCamera_to_world);
         DepthEffect(gRender_screen, gDepth_buffer, gCamera, &gCamera_to_world);
         if (!gAusterity_mode) {
             ProcessTrack(gUniverse_actor, &gProgram_state.track_spec, gCamera, &gCamera_to_world, 1);
         }
+#ifdef __DREAMCAST__
+        // fx sub-split: everything before this point is the sky dome add
+        // (DoHorizon) + the (early-returning) DepthEffect; everything after is
+        // the smoke/splash/spark effects. Separates the two suspects for the
+        // 4-11ms fx spikes seen in the open world.
+        uint64_t _dc_fx2_t0 = timer_us_gettime64();
+#endif
         RenderSplashes();
         RenderSmoke(gRender_screen, gDepth_buffer, gCamera, &gCamera_to_world, gFrame_period);
         RenderSparks(gRender_screen, gDepth_buffer, gCamera, &gCamera_to_world, gFrame_period);
         RenderProximityRays(gRender_screen, gDepth_buffer, gCamera, &gCamera_to_world, gFrame_period);
+#ifdef __DREAMCAST__
+        g_dc_t_fx2 += timer_us_gettime64() - _dc_fx2_t0;
+        g_dc_t_fx += timer_us_gettime64() - _dc_fx_t0;
+#endif
         BrZbSceneRenderEnd();
     }
+#ifdef __DREAMCAST__
+    g_dc_t_scene += timer_us_gettime64() - _dc_scene_t0;
+#endif
+#undef DC_SUB_LAP
 #ifdef DETHRACE_3DFX_PATCH
     PDLockRealBackScreen(1);
 #endif

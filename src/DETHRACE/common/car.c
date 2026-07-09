@@ -176,6 +176,12 @@ float gCar_simplification_factor[2][5] = {
 };
 
 // GLOBAL: CARM95 0x00514e28
+// Dreamcast port note: this compile-time default is irrelevant in practice -
+// the demo ships DATA/OPTIONS.TXT, which overrides it on every boot. Measured
+// on hardware anyway (via a pick diagnostic): opponents already render their
+// SIMPLE model at the start grid and ProcessNonTrackActors still costs
+// 11-17ms, so opponent LOD is not a perf lever; the per-visible-car cost is
+// wheels/driver/per-actor overhead, not body faces.
 int gCar_simplification_level = 0;
 
 // GLOBAL: CARM95 0x00514e2c
@@ -4653,6 +4659,16 @@ void MungeCarGraphics(tU32 pFrame_period) {
                 }
             }
             if (the_car->driver != eDriver_local_human && the_car->car_model_variable) {
+#ifdef __DREAMCAST__
+                // Level 4's factor is 0.0 and the original relies on x/0.0
+                // giving +inf so the first (simplest) model is always picked.
+                // The Dreamcast build's fast-math float flags make division by
+                // zero undefined instead, so make the "always simplest" case
+                // explicit rather than dividing.
+                if (gCar_simplification_factor[gGraf_spec_index][gCar_simplification_level] == 0.0f) {
+                    distance_from_camera = 1e30f;
+                } else
+#endif
                 distance_from_camera = Vector3DistanceSquared(&the_car->car_master_actor->t.t.translate.t,
                                            (br_vector3*)gCamera_to_world.m[3])
                     / gCar_simplification_factor[gGraf_spec_index][gCar_simplification_level];

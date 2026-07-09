@@ -37,7 +37,12 @@
 // flicker returning (means it was never in this set).
 #define DC_FEAT_MIPMAP 0
 #define DC_FEAT_ZBIAS 0
-#define DC_FEAT_FOG 0
+// Re-enabled: this was switched off as part of the old flicker-isolation
+// baseline and never turned back on after the flicker was fixed elsewhere.
+// The fog parameters (gDC_fog_*) have been computed by DepthEffect all along;
+// this just lets the per-polygon fog_type actually use them. Restores the
+// level fog the software renderer shows, and masks track pop-in at the yon.
+#define DC_FEAT_FOG 1
 #define DC_FEAT_EVICT 1
 #define DC_FEAT_BILINEAR 0
 #define DC_FEAT_STALECHECK 0
@@ -510,6 +515,23 @@ void DCPVR3D_AddTri(
     DCPVR3D_AddTriTex(x0, y0, z0, 0, 0, c0, x1, y1, z1, 0, 0, c1, x2, y2, z2, 0, 0, c2, -1, 0);
 }
 
+// Fast path for the per-triangle bridge (dc_triangle_fill): reserve one
+// triangle's three vertices and let the caller write them in place. Avoids
+// AddTriTex's 20 scalar stack arguments plus a second copy per triangle -
+// dc_triangle_fill runs for every visible triangle, so this is hot. Returns
+// NULL when the frame buffer of triangles is full (caller just drops the tri,
+// same policy as AddTriTex). The returned pointer is 3 consecutive
+// tDC3D_vertex (layout shared with v1model.c - see the mirror declaration
+// there).
+void* DCPVR3D_AllocTri(int texid, int category) {
+    if (g3d_tri_count >= DC3D_MAX_TRIS) {
+        return NULL;
+    }
+    g3d_tritex[g3d_tri_count] = (int16_t)texid;
+    g3d_tricat[g3d_tri_count] = (uint8_t)category;
+    return &g3d_verts[3 * g3d_tri_count++];
+}
+
 // Expand a game palette index to an opaque ARGB8888 colour (from the current
 // RGB565 palette). Used for untextured flat/gouraud-shaded geometry, where the
 // softrend vertex intensity is already the final shade-ramp palette index, not a
@@ -839,7 +861,34 @@ static void DCPVR_CreateWindow(const char* title, int width, int height, tHarnes
     gFps_last_time = SDL_GetTicks();
 }
 
+// Temporary walk attribution split (us, accumulated, printed per second from
+// the fps line). The earlier profiling lumped everything between two Swaps into
+// one "walk" number and attributed it to BRender - but that span also contains
+// the game logic (physics/AI/sound) and the software effects. Before touching
+// BRender's core, split it:
+//   g_dc_t_scene - the whole BrZbSceneRenderBegin..End block in RenderAFrame
+//                  (BRender geometry + our triangle bridge)
+//   g_dc_t_fx    - software effects inside that block (DepthEffect*, splashes,
+//                  smoke, sparks, proximity rays - CPU pixel work)
+//   walk - scene = game logic and everything else per frame.
+uint64_t g_dc_t_scene, g_dc_t_fx, g_dc_t_fx2;
+// Sub-split of g_dc_t_scene (also filled from RenderAFrame): the shadow pass
+// (per-car ray/face maths + its own scene render), the non-track actors
+// (cars/peds), and the track walk. scene minus these three = lollipops,
+// depth-effects wrapper and BrZbSceneRenderEnd.
+uint64_t g_dc_t_shad, g_dc_t_ntrack, g_dc_t_track;
+// Actors under gNon_track_actor this frame (set from RenderAFrame).
+int g_dc_actor_count;
+static uint64_t g_t_walk;
+static uint64_t g_last_swap_end;
+
 static void DCPVR_Swap(br_pixelmap* back_buffer) {
+    {
+        uint64_t now = timer_us_gettime64();
+        if (g_last_swap_end != 0) {
+            g_t_walk += now - g_last_swap_end;
+        }
+    }
     DCPVR_ProcessWindowMessages();
 
     if (back_buffer != NULL && back_buffer->pixels != NULL) {
@@ -1002,8 +1051,26 @@ static void DCPVR_Swap(br_pixelmap* back_buffer) {
             // path vs the remaining scalar paths, summed over this interval -
             // shows whether extending sh4zam to the scalar functions is worth
             // it. Divide by frame count for per-frame vertex volume.
-            printf("[dcpvr] fps=%d tris=%d tex=%d/%d evict=%d\n",
-                fps, g3d_last_submitted, g3d_tex_count, DC3D_MAX_TEX, g3d_diag_evictions);
+            int _fc = gFrame_count ? gFrame_count : 1;
+            // walk = everything between two Swaps; scene = the BrZbSceneRender
+            // block (BRender); fx = software effects inside it; logic = the rest.
+            // fx = sky-dome add + smoke/splash/sparks; fxsmk = just the latter.
+            printf("[dcpvr] fps=%d tris=%d act=%d | scene=%luus (shad=%lu ntrk=%lu trk=%lu fx=%lu fxsmk=%lu) logic=%luus\n",
+                fps, g3d_last_submitted, g_dc_actor_count,
+                (unsigned long)(g_dc_t_scene / _fc),
+                (unsigned long)(g_dc_t_shad / _fc),
+                (unsigned long)(g_dc_t_ntrack / _fc),
+                (unsigned long)(g_dc_t_track / _fc),
+                (unsigned long)(g_dc_t_fx / _fc),
+                (unsigned long)(g_dc_t_fx2 / _fc),
+                (unsigned long)((g_t_walk > g_dc_t_scene ? g_t_walk - g_dc_t_scene : 0) / _fc));
+            g_t_walk = 0;
+            g_dc_t_scene = 0;
+            g_dc_t_fx = 0;
+            g_dc_t_fx2 = 0;
+            g_dc_t_shad = 0;
+            g_dc_t_ntrack = 0;
+            g_dc_t_track = 0;
             g3d_diag_notex = 0;
             g3d_diag_texfail = 0;
             g3d_diag_nullps = 0;
@@ -1030,6 +1097,10 @@ static void DCPVR_Swap(br_pixelmap* back_buffer) {
             gFps_last_time = now;
         }
     }
+
+    // End-of-Swap mark so the next frame's walk excludes this Swap itself
+    // (and the fps-limiter sleep above).
+    g_last_swap_end = timer_us_gettime64();
 }
 
 // Free all cached PowerVR textures and reset the cache. Called when the palette
